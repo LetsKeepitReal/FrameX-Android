@@ -73,21 +73,39 @@ fun GameLauncherSection(
             }
         } else {
             val userAppsMap = remember(userApps) { userApps.associateBy { it.packageName } }
+            // Filter launcherGames to only include packages that are actually installed on the device
+            val installedLauncherGames = remember(launcherGames, userAppsMap) {
+                if (userApps.isEmpty()) launcherGames.toList()
+                else launcherGames.filter { userAppsMap.containsKey(it) }
+            }
             
-            // Replaced chunked grid with LazyRow to eliminate forced spacer weights
-            LazyRow(
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                contentPadding = PaddingValues(horizontal = 24.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                items(launcherGames.toList(), key = { it }) { pkg ->
-                    val app = userAppsMap[pkg] ?: AppInfo(pkg, pkg.substringAfterLast('.'))
-                    Card(
-                        modifier = Modifier.clickable { onGameConfigClicked(pkg) },
-                        shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                        border = BorderStroke(1.dp, Color.White.copy(0.04f))
-                    ) {
+            if (installedLauncherGames.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp)
+                        .height(120.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(Color.White.copy(0.02f))
+                        .border(1.dp, Color.White.copy(0.04f), RoundedCornerShape(16.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("No games added to launcher", color = Color.Gray, fontSize = 13.sp)
+                }
+            } else {
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    contentPadding = PaddingValues(horizontal = 24.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    items(installedLauncherGames, key = { it }) { pkg ->
+                        val app = userAppsMap[pkg] ?: AppInfo(pkg, pkg.substringAfterLast('.'))
+                        Card(
+                            modifier = Modifier.clickable { onGameConfigClicked(pkg) },
+                            shape = RoundedCornerShape(16.dp),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                            border = BorderStroke(1.dp, Color.White.copy(0.04f))
+                        ) {
                         Row(
                             modifier = Modifier
                                 .padding(horizontal = 16.dp, vertical = 12.dp),
@@ -141,6 +159,7 @@ fun GameLauncherSection(
                     }
                 }
             }
+        }
         }
 
         Spacer(modifier = Modifier.height(24.dp))

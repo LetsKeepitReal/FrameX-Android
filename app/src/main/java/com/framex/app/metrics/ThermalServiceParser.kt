@@ -89,6 +89,18 @@ internal object ThermalServiceParser {
             }
         }
 
+        if (entryCount == 0) {
+            val fallback = parseFallbackZones(output)
+            if (fallback.entryCount > 0) {
+                cpu = fallback.cpuC
+                gpu = fallback.gpuC
+                skin = fallback.skinC
+                npu = fallback.npuC
+                battery = fallback.batteryC
+                entryCount = fallback.entryCount
+            }
+        }
+
         val thermalStatus = statusRegex.find(output)
             ?.groupValues?.get(1)
             ?.toIntOrNull()
@@ -110,11 +122,57 @@ internal object ThermalServiceParser {
         )
     }
 
+    private fun parseFallbackZones(output: String): Result {
+        val lines = output.lines().map { it.trim() }.filter { it.isNotBlank() }
+        val names = mutableListOf<Pair<Int, SensorKind>>()
+        val values = mutableListOf<Pair<Int, Float>>()
+
+        for ((idx, line) in lines.withIndex()) {
+            val num = line.toFloatOrNull()
+            if (num != null) {
+                val degC = if (kotlin.math.abs(num) > 200f) num / 1000f else num
+                if (degC in 0f..120f) {
+                    values.add(idx to degC)
+                }
+            } else {
+                val kind = classify(null, line)
+                if (kind != SensorKind.UNKNOWN) {
+                    names.add(idx to kind)
+                }
+            }
+        }
+
+        var cpu: Float? = null
+        var gpu: Float? = null
+        var skin: Float? = null
+        var npu: Float? = null
+        var battery: Float? = null
+        var count = 0
+
+        if (names.isNotEmpty() && values.isNotEmpty()) {
+            for ((nameIdx, kind) in names) {
+                val matchVal = values.firstOrNull { it.first >= nameIdx } ?: values.firstOrNull()
+                if (matchVal != null) {
+                    when (kind) {
+                        SensorKind.CPU -> if (cpu == null) { cpu = matchVal.second; count++ }
+                        SensorKind.GPU -> if (gpu == null) { gpu = matchVal.second; count++ }
+                        SensorKind.SKIN -> if (skin == null) { skin = matchVal.second; count++ }
+                        SensorKind.NPU -> if (npu == null) { npu = matchVal.second; count++ }
+                        SensorKind.BATTERY -> if (battery == null) { battery = matchVal.second; count++ }
+                        else -> {}
+                    }
+                }
+            }
+        }
+
+        return Result(cpuC = cpu, gpuC = gpu, skinC = skin, npuC = npu, batteryC = battery, entryCount = count)
+    }
+
     private enum class SensorKind { CPU, GPU, SKIN, NPU, BATTERY, UNKNOWN }
 
     /**
      * AOSP Temperature types: 0=CPU 1=GPU 2=BATTERY 3=SKIN 9=NPU.
-     * Name fallback is case-insensitive and matches common OEM labels.
+     * Name fallback is case-insensitive and matches common OEM/Qualcomm labels.
      */
     private fun classify(type: Int?, name: String): SensorKind {
         when (type) {
@@ -127,12 +185,11 @@ internal object ThermalServiceParser {
 
         val n = name.uppercase()
         return when {
-            n.contains("SKIN") -> SensorKind.SKIN
-            n.contains("GPU") || n.contains("GRAPHICS") -> SensorKind.GPU
-            n.contains("NPU") || n.contains("TPU") || n.contains("APU") -> SensorKind.NPU
+            n.contains("SKIN") || n.contains("QUIET_THERM") || n.contains("XO_THERM") -> SensorKind.SKIN
+            n.contains("GPU") || n.contains("GPUSS") || n.contains("GRAPHICS") -> SensorKind.GPU
+            n.contains("NPU") || n.contains("TPU") || n.contains("APU") || n.contains("Q6-HVX") -> SensorKind.NPU
             n.contains("BATTERY") || n.contains("BATT") -> SensorKind.BATTERY
-            // CPU last: many labels include "CPU" as a substring of longer names
-            n.contains("CPU") || n.contains("SOC") || n.contains("CLUSTER") -> SensorKind.CPU
+            n.contains("CPU") || n.contains("SOC") || n.contains("CLUSTER") || n.contains("CPUSS") -> SensorKind.CPU
             else -> SensorKind.UNKNOWN
         }
     }

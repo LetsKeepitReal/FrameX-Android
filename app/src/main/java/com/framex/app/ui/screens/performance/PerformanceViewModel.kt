@@ -89,11 +89,23 @@ class PerformanceViewModel @Inject constructor(
 
     fun loadUserApps() {
         viewModelScope.launch {
-            _userApps.value = withContext(Dispatchers.IO) {
+            val installedUser = withContext(Dispatchers.IO) {
                 gamingModeEngine.getInstalledUserApps()
             }
-            _googleApps.value = withContext(Dispatchers.IO) {
+            val installedGoogle = withContext(Dispatchers.IO) {
                 gamingModeEngine.getGoogleAppsForWhitelist()
+            }
+            _userApps.value = installedUser
+            _googleApps.value = installedGoogle
+
+            // Auto-prune uninstalled packages from launcherGames
+            val installedPkgs = installedUser.map { it.packageName }.toSet()
+            if (installedPkgs.isNotEmpty()) {
+                val currentLauncher = settingsRepository.launcherGames.value
+                val validLauncher = currentLauncher.filter { it in installedPkgs }.toSet()
+                if (validLauncher.size != currentLauncher.size) {
+                    settingsRepository.setLauncherGames(validLauncher)
+                }
             }
         }
     }
