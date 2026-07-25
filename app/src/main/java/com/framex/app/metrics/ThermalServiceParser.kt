@@ -123,7 +123,46 @@ internal object ThermalServiceParser {
     }
 
     private fun parseFallbackZones(output: String): Result {
+        var cpu: Float? = null
+        var gpu: Float? = null
+        var skin: Float? = null
+        var npu: Float? = null
+        var battery: Float? = null
+        var count = 0
+
         val lines = output.lines().map { it.trim() }.filter { it.isNotBlank() }
+
+        // Strategy 1: Explicit name:value pair lines (from sh -c 'for z in ...; do echo "$name:$temp"; done')
+        for (line in lines) {
+            if (line.contains(":")) {
+                val parts = line.split(":").map { it.trim() }
+                if (parts.size >= 2) {
+                    val namePart = parts[parts.size - 2]
+                    val valPart = parts.last()
+                    val rawNum = valPart.toFloatOrNull()
+                    if (rawNum != null) {
+                        val degC = if (kotlin.math.abs(rawNum) > 200f) rawNum / 1000f else rawNum
+                        if (degC in 0f..120f) {
+                            val kind = classify(null, namePart)
+                            when (kind) {
+                                SensorKind.CPU -> if (cpu == null) { cpu = degC; count++ }
+                                SensorKind.GPU -> if (gpu == null) { gpu = degC; count++ }
+                                SensorKind.SKIN -> if (skin == null) { skin = degC; count++ }
+                                SensorKind.NPU -> if (npu == null) { npu = degC; count++ }
+                                SensorKind.BATTERY -> if (battery == null) { battery = degC; count++ }
+                                else -> {}
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if (count > 0) {
+            return Result(cpuC = cpu, gpuC = gpu, skinC = skin, npuC = npu, batteryC = battery, entryCount = count)
+        }
+
+        // Strategy 2: Legacy fallback for unstructured text
         val names = mutableListOf<Pair<Int, SensorKind>>()
         val values = mutableListOf<Pair<Int, Float>>()
 
@@ -141,13 +180,6 @@ internal object ThermalServiceParser {
                 }
             }
         }
-
-        var cpu: Float? = null
-        var gpu: Float? = null
-        var skin: Float? = null
-        var npu: Float? = null
-        var battery: Float? = null
-        var count = 0
 
         if (names.isNotEmpty() && values.isNotEmpty()) {
             for ((nameIdx, kind) in names) {

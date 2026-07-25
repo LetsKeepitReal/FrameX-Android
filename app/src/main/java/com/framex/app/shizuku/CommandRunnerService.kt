@@ -66,18 +66,18 @@ class CommandRunnerService(private val context: Context) : ICommandRunner.Stub()
                 }
             }
             val dump = executeCommand("dumpsys thermalservice")
-            if (dump.contains("Temperature{") || dump.contains("cpu-") || dump.contains("gpuss-") || dump.contains("quiet_therm")) {
+            if (dump.contains("Temperature{") || dump.contains("mValue=")) {
                 return dump
             }
             // Fallback for devices where dumpsys thermalservice outputs no sensor data (e.g. Redmi K20 Pro / HAL Ready: false)
-            val sysfsDump = executeCommand("cat /sys/class/thermal/thermal_zone*/type /sys/class/thermal/thermal_zone*/temp")
-            if (sysfsDump.isNotBlank()) {
+            val sysfsDump = executeCommand("sh -c 'for z in /sys/class/thermal/thermal_zone*; do echo \"\$(cat \$z/type 2>/dev/null):\$(cat \$z/temp 2>/dev/null)\"; done'")
+            if (sysfsDump.isNotBlank() && sysfsDump.contains(":")) {
                 return sysfsDump
             }
             return dump
         } catch (e: Exception) {
-            val sysfsDump = executeCommand("cat /sys/class/thermal/thermal_zone*/type /sys/class/thermal/thermal_zone*/temp")
-            if (sysfsDump.isNotBlank()) sysfsDump else executeCommand("dumpsys thermalservice")
+            val sysfsDump = executeCommand("sh -c 'for z in /sys/class/thermal/thermal_zone*; do echo \"\$(cat \$z/type 2>/dev/null):\$(cat \$z/temp 2>/dev/null)\"; done'")
+            if (sysfsDump.isNotBlank() && sysfsDump.contains(":")) sysfsDump else executeCommand("dumpsys thermalservice")
         }
     }
 
