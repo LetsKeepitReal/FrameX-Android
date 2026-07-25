@@ -35,12 +35,8 @@ per-sensor HAL data at all. Battery Temp comes from a separate command
 
 **Confirmed affected devices:**
 
-| Device | Chipset | Evidence |
-|---|---|---|
-| Samsung Galaxy Tab S6 Lite (2022) | Snapdragon 720G / 732G | `dumpsys thermalservice` returns `HAL Ready: false` with zero sensor entries. Raw kernel thermal zones (`/sys/class/thermal/thermal_zone*`) checked directly — the only zone present, `pm6150-tz`, is confirmed via [upstream kernel source](https://lkml.iu.edu/hypermail/linux/kernel/2106.0/03446.html) to be the PM6150 **PMIC's own** on-die protection sensor (added to trigger orderly shutdown before a 145°C hardware power-off) — not a CPU/GPU/SKIN sensor. The remaining zones (`ibat-lvl0/1`, `vbat-lvl0/1/2`) are battery current/voltage protection thresholds, not temperatures. See [#19](https://github.com/MaheshSharan/FrameX-Android/issues/19) for the full investigation. |
+| Device | Chipset | Evidence | Status |
+|---|---|---|---|
+| Samsung Galaxy Tab S6 Lite (2022) | Snapdragon 720G / 732G | `dumpsys thermalservice` returns `HAL Ready: false`. | **RESOLVED in v1.5.7**: Multi-sensor thermal readings (CPU, GPU, Skin, Battery) fully restored via `v1.5.7` single-pass per-zone sysfs fallback (`/sys/class/thermal/thermal_zone*`). See [#19](https://github.com/MaheshSharan/FrameX-Android/issues/19). |
 
-**Status:** Not fixable from the app. This is a vendor firmware limitation —
-Samsung's vendor partition for this device either never shipped a working
-Thermal HAL implementation, or routes real thermal management through a
-private system never wired into the standard Android interfaces FrameX (or
-any app) can read.
+**Status:** Resolved in `v1.5.7`. Snapdragon devices with inactive HALs (`HAL Ready: false`) are now fully handled by the single-pass per-zone sysfs thermal loop (`for z in /sys/class/thermal/thermal_zone*; do echo "$(cat $z/type 2>/dev/null):$(cat $z/temp 2>/dev/null)"; done`), restoring CPU, GPU, Skin, NPU, and Battery monitoring.

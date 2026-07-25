@@ -30,20 +30,20 @@
 > **Encountering "Parse Failed" or "Unsupported Hardware"?**
 >
 > If thermal monitoring displays **"Parse Failed"** or **"Unsupported Hardware"** on your device:
->
 > 1. Clone the repository and install the **Debug APK** (`./gradlew installDebug`) or download **[FrameX-v1.5.7-debug.apk](https://github.com/MaheshSharan/FrameX-Android/releases/download/v1.5.7/FrameX_v1.5.7-debug.apk)**. *(Release builds strip diagnostic logs via ProGuard).*
 > 2. Open the **Thermal Diagnostics** screen in FrameX.
 > 3. Run the following ADB commands to capture complete diagnostics:
->
 >    ```bash
 >    # 1. Capture FrameX internal thermal logs
 >    adb logcat -d | grep -E "ThermalMonitor|CmdRunner"
 >
 >    # 2. Capture raw system thermal HAL dump
 >    adb shell dumpsys thermalservice
->    ```
 >
->    *(On Windows PowerShell: `adb logcat -d | Select-String -Pattern "ThermalMonitor|CmdRunner"`)*
+>    # 3. Capture sysfs thermal zones (if dumpsys is empty/HAL Ready: false)
+>    adb shell "for z in /sys/class/thermal/thermal_zone*; do echo \"\$(cat \$z/type 2>/dev/null):\$(cat \$z/temp 2>/dev/null)\"; done"
+>    ```
+>    *(On Windows PowerShell for Step 1: `adb logcat -d | Select-String -Pattern "ThermalMonitor|CmdRunner"`)*
 > 4. Open a GitHub Issue attaching the outputs above along with your **device model**, **SoC**, and **Android/ROM version**.
 
 ---
@@ -51,9 +51,9 @@
 
 FrameX shows a draggable, fully customisable overlay with live system stats on top of any app or game — including full-screen titles.
 
-**Available metrics:** FPS · CPU frequency · CPU core clusters · RAM usage · Battery temperature · Network speed · Ping
+**Available metrics:** FPS · CPU frequency & core clusters · Multi-sensor Thermals (CPU, GPU, Skin, NPU, Battery) · RAM usage · Network speed · Ping
 
-**Performance Mode:** Optimize your device for gaming by suspending bloatware, restricting background apps, enabling advanced Do Not Disturb, and deploying per-game display/volume configurations.
+**Performance Mode:** Optimize your device for gaming by suspending bloatware, restricting background apps, enabling advanced Do Not Disturb, deploying per-game display/volume configurations, and triggering OriginOS Esports hardware engines.
 
 ---
 
@@ -122,6 +122,9 @@ cd FrameX-Android
 | Access notification policy | Required to toggle Do Not Disturb mode automatically |
 | Modify system settings | Required to deploy per-game brightness, volume, and rotation overrides |
 | Foreground service (Special Use) | Ensures Gaming Mode stays active on Android 14+ |
+| Post Notifications (Android 13+) | Display session status & quick-control notification controls |
+| QUERY_ALL_PACKAGES | Load installed games and apps for Game Launcher optimization |
+| Shizuku Privileged API | High-precision FPS metering (`SurfaceFlinger`), multi-sensor thermal diagnostics (`IThermalService`), ART RAM heap compaction, and OriginOS Esports hardware engine |
 
 ---
 
