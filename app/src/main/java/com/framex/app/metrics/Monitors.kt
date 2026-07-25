@@ -533,9 +533,8 @@ class PingMonitor @Inject constructor(
     private val shizukuManager: ShizukuManager
 ) {
     companion object {
-        // ICMP echo has near-zero cost, but child "ping" process still costs a bit of CPU/battery.
-        // 20s keeps the reading fresh without polling faster than a human perceives latency changing.
-        private const val POLL_INTERVAL_MS = 20_000L
+        // ICMP echo has near-zero cost. 2s polling keeps live overlay ping responsive without battery overhead.
+        private const val POLL_INTERVAL_MS = 2_000L
     }
 
     val ping: Flow<Int> = flow {

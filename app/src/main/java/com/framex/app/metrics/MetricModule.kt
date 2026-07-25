@@ -21,7 +21,8 @@ enum class MetricModuleId(val storageKey: String) {
     RAM_USAGE("ram"),
     BATTERY_TEMPERATURE("temp"),
     THERMAL_MONITOR("thermal"),
-    NETWORK_SPEED("net");
+    NETWORK_SPEED("net"),
+    PING("ping");
 
     companion object {
         fun fromStorageKey(storageKey: String): MetricModuleId? =
@@ -51,7 +52,8 @@ val DEFAULT_METRIC_MODULE_ORDER: List<MetricModuleId> = listOf(
     MetricModuleId.RAM_USAGE,
     MetricModuleId.BATTERY_TEMPERATURE,
     MetricModuleId.THERMAL_MONITOR,
-    MetricModuleId.NETWORK_SPEED
+    MetricModuleId.NETWORK_SPEED,
+    MetricModuleId.PING
 )
 
 val METRIC_MODULE_REGISTRY: Map<MetricModuleId, MetricModuleInfo> = listOf(
@@ -73,7 +75,8 @@ val METRIC_MODULE_REGISTRY: Map<MetricModuleId, MetricModuleInfo> = listOf(
         Icons.Default.LocalFireDepartment,
         "CPU 63°C · MODERATE"
     ),
-    MetricModuleInfo(MetricModuleId.NETWORK_SPEED, "Network Speed", "NET", Icons.Default.NetworkCheck, "1.2 MB")
+    MetricModuleInfo(MetricModuleId.NETWORK_SPEED, "Network Speed", "NET", Icons.Default.NetworkCheck, "1.2 MB"),
+    MetricModuleInfo(MetricModuleId.PING, "Ping Latency", "PING", Icons.Default.NetworkCheck, "35 ms")
 ).associateBy { it.id }
 
 /**
@@ -116,6 +119,7 @@ fun metricValueFor(id: MetricModuleId, metricsState: MetricsState): String = whe
             String.format("%.0f KB/s", totalKbps)
         }
     }
+    MetricModuleId.PING -> if (metricsState.pingMs > 0) "${metricsState.pingMs} ms" else "-- ms"
 }
 
 /** Short label for the overlay's compact/minimal display — full names are used in
