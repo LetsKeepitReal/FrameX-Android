@@ -65,9 +65,19 @@ class CommandRunnerService(private val context: Context) : ICommandRunner.Stub()
                     }
                 }
             }
-            executeCommand("dumpsys thermalservice")
+            val dump = executeCommand("dumpsys thermalservice")
+            if (dump.contains("Temperature{") || dump.contains("cpu-") || dump.contains("gpuss-") || dump.contains("quiet_therm")) {
+                return dump
+            }
+            // Fallback for devices where dumpsys thermalservice outputs no sensor data (e.g. Redmi K20 Pro / HAL Ready: false)
+            val sysfsDump = executeCommand("cat /sys/class/thermal/thermal_zone*/type /sys/class/thermal/thermal_zone*/temp")
+            if (sysfsDump.isNotBlank()) {
+                return sysfsDump
+            }
+            return dump
         } catch (e: Exception) {
-            executeCommand("dumpsys thermalservice")
+            val sysfsDump = executeCommand("cat /sys/class/thermal/thermal_zone*/type /sys/class/thermal/thermal_zone*/temp")
+            if (sysfsDump.isNotBlank()) sysfsDump else executeCommand("dumpsys thermalservice")
         }
     }
 
