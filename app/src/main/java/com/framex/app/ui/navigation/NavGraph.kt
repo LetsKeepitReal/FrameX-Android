@@ -58,22 +58,28 @@ fun FrameXNavGraph(
             )
         }
         composable(Screen.Appearance.route) {
-            AppearanceScreen(onNavigateBack = { navController.popBackStack() })
+            AppearanceScreen(onNavigateBack = { navController.safePopBackStack() })
         }
         composable(Screen.OverlayCustomization.route) {
-            OverlayCustomizationScreen(onNavigateBack = { navController.popBackStack() })
+            OverlayCustomizationScreen(onNavigateBack = { navController.safePopBackStack() })
         }
         composable(Screen.Permissions.route) {
-            PermissionsScreen(onNavigateBack = { navController.popBackStack() })
+            PermissionsScreen(onNavigateBack = { navController.safePopBackStack() })
         }
         composable(Screen.About.route) {
-            AboutScreen(onNavigateBack = { navController.popBackStack() })
+            AboutScreen(onNavigateBack = { navController.safePopBackStack() })
         }
         composable(Screen.Performance.route) {
-            PerformanceScreen(onNavigateBack = { navController.popBackStack() })
+            PerformanceScreen(onNavigateBack = { navController.safePopBackStack() })
         }
         composable(Screen.ThermalDiagnostics.route) {
-            ThermalDiagnosticsScreen(onNavigateBack = { navController.popBackStack() })
+            ThermalDiagnosticsScreen(onNavigateBack = { navController.safePopBackStack() })
         }
+    }
+}
+
+private fun NavHostController.safePopBackStack() {
+    if (previousBackStackEntry != null) {
+        popBackStack()
     }
 }
