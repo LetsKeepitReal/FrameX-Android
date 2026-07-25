@@ -295,6 +295,7 @@ fun DashboardScreen(
                 
                 Spacer(modifier = Modifier.height(24.dp))
                 if (isOverlayRunning) {
+                    val primaryAccent = MaterialTheme.colorScheme.primary
                     Button(
                         onClick = {
                             val intent = Intent(context, OverlayService::class.java).apply {
@@ -302,7 +303,10 @@ fun DashboardScreen(
                             }
                             context.startService(intent)
                         },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color.Red.copy(0.2f), contentColor = Color.Red),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = primaryAccent.copy(alpha = 0.15f),
+                            contentColor = primaryAccent
+                        ),
                         shape = CircleShape,
                         modifier = Modifier.fillMaxWidth().height(56.dp)
                     ) {
@@ -313,7 +317,9 @@ fun DashboardScreen(
                         PrimaryButton(
                             text = "Start Overlay",
                             onClick = {
-                                val intent = Intent(context, OverlayService::class.java)
+                                val intent = Intent(context, OverlayService::class.java).apply {
+                                    action = OverlayService.ACTION_START
+                                }
                                 context.startForegroundService(intent)
                             },
                             icon = { Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(28.dp)) }

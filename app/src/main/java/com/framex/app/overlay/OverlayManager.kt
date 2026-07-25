@@ -44,6 +44,9 @@ import com.framex.app.metrics.resolveMetricModuleOrder
 import com.framex.app.ui.theme.FrameXTheme
 import com.framex.app.utils.FrameXLog
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -57,6 +60,12 @@ class OverlayManager @Inject constructor(
     private var composeView: ComposeView? = null
     private var overlayLifecycleOwner: OverlayLifecycleOwner? = null
     private var windowParams: WindowManager.LayoutParams? = null
+
+    // Single source of truth for "is the overlay currently drawn on screen", independent of
+    // whether OverlayService/its foreground notification is alive. The notification action
+    // receiver observes this to decide which action set to render (Start vs Stop).
+    private val _isOverlayVisible = MutableStateFlow(false)
+    val isOverlayVisible: StateFlow<Boolean> = _isOverlayVisible.asStateFlow()
 
     fun showOverlay() {
         FrameXLog.d("Attempting to show overlay...")
@@ -204,6 +213,7 @@ class OverlayManager @Inject constructor(
 
         try {
             windowManager.addView(composeView, windowParams)
+            _isOverlayVisible.value = true
             com.framex.app.utils.FrameXLog.d("Overlay successfully added to WindowManager.")
         } catch (e: Exception) {
             com.framex.app.utils.FrameXLog.e("Failed to add overlay to WindowManager: ${e.message}", e)
@@ -218,6 +228,7 @@ class OverlayManager @Inject constructor(
             overlayLifecycleOwner = null
             windowParams = null
         }
+        _isOverlayVisible.value = false
     }
 
     fun handleOrientationChange(orientation: Int) {

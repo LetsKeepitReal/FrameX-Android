@@ -103,6 +103,10 @@
             android:name=".update.UpdateInstallerReceiver"
             android:exported="false" />
 
+        <receiver
+            android:name=".overlay.OverlayNotificationActionReceiver"
+            android:exported="false" />
+
         <provider
             android:name="rikka.shizuku.ShizukuProvider"
             android:authorities="${applicationId}.shizuku"

@@ -11,7 +11,6 @@ import android.content.IntentFilter
 import android.os.Build
 import android.os.IBinder
 import android.os.PowerManager
-import androidx.core.app.NotificationCompat
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -67,12 +66,12 @@ class OverlayService : Service() {
         // OEM ROMs (vivo, IQOO, Realme) treat this service as I/O-critical, not killable.
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             startForeground(
-                1,
-                createNotification(),
+                NOTIFICATION_ID,
+                buildNotification(isOverlayVisible = true),
                 android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK
             )
         } else {
-            startForeground(1, createNotification())
+            startForeground(NOTIFICATION_ID, buildNotification(isOverlayVisible = true))
         }
 
         // Acquire the WakeLock only while the screen is on (i.e. an active session), and
@@ -130,20 +129,18 @@ class OverlayService : Service() {
         }
     }
 
-    private fun createNotification(): Notification {
-        return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("FrameX Overlay Active")
-            .setContentText("Monitoring system performance")
-            .setSmallIcon(com.framex.app.R.drawable.ic_notification)
-            .setPriority(NotificationCompat.PRIORITY_LOW)
-            .setOngoing(true)       // Prevents the user (and game-boost) from swiping it away
-            .setSilent(true)
-            .build()
-    }
+    private fun buildNotification(isOverlayVisible: Boolean): Notification =
+        OverlayNotificationBuilder.build(this, isOverlayVisible)
 
     companion object {
         const val CHANNEL_ID = "framex_overlay_channel"
+        // No explicit handling needed in onStartCommand: onCreate always calls
+        // overlayManager.showOverlay() unconditionally. This constant exists so callers
+        // (DashboardScreen, notification actions) can express intent explicitly rather
+        // than sending an action-less Intent.
+        const val ACTION_START = "com.framex.app.ACTION_START_OVERLAY"
         const val ACTION_STOP = "com.framex.app.ACTION_STOP_OVERLAY"
+        const val NOTIFICATION_ID = 1
 
         private val _isRunning = MutableStateFlow(false)
         val isRunning: StateFlow<Boolean> = _isRunning.asStateFlow()
