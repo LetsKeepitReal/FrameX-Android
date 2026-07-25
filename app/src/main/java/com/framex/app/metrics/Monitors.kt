@@ -420,8 +420,20 @@ class ThermalMonitor @Inject constructor(
         val hasBattery: Boolean = false
     ) {
         val statusLabel: String get() = when (status) {
-            0 -> "NONE"; 1 -> "LIGHT"; 2 -> "MODERATE"; 3 -> "SEVERE"
-            4 -> "CRITICAL"; 5 -> "EMERGENCY"; 6 -> "SHUTDOWN"; else -> "?"
+            0 -> "Normal"
+            1 -> "Light Throttling"
+            2 -> "Moderate Throttling"
+            3 -> "Severe Throttling"
+            4 -> "Critical Throttling"
+            5 -> "Emergency Mitigation"
+            6 -> "System Shutdown"
+            else -> "Unknown"
+        }
+
+        val pressureLabel: String get() = when (status) {
+            0 -> "Stable"
+            1, 2 -> "Rising"
+            else -> "Elevated"
         }
     }
 

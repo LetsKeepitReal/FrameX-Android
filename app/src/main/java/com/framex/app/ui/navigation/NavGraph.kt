@@ -12,7 +12,7 @@ import com.framex.app.ui.screens.OnboardingScreen
 import com.framex.app.ui.screens.OverlayCustomizationScreen
 import com.framex.app.ui.screens.PermissionsScreen
 import com.framex.app.ui.screens.SplashScreen
-import com.framex.app.ui.screens.ThermalDiagnosticsScreen
+import com.framex.app.ui.screens.thermal.ThermalDiagnosticsScreen
 import com.framex.app.ui.screens.performance.PerformanceScreen
 
 sealed class Screen(val route: String) {
