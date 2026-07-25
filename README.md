@@ -4,15 +4,12 @@
 
 > Rootless Android performance overlay featuring live FPS metering, thermal diagnostics, and privileged gaming optimization via Shizuku.
 
-> [!IMPORTANT]
-> **Gaming Performance Mode** is optimized specifically for **Android 16** and **Vivo OriginOS/FuntouchOS** devices. For Vivo/iQOO devices, enable the **Vivo Optimization** toggle in Settings (About) first to unlock maximum gaming performance and bypass dynamic thermal downclocking. Behavior on other Android skins may vary. Use this feature at your own risk.
-
 <p align="center">
   <a href="https://github.com/MaheshSharan/FrameX-Android/releases/latest">
     <img src="https://img.shields.io/github/downloads/MaheshSharan/FrameX-Android/total?style=for-the-badge&logo=android&label=Total%20Downloads&color=4CAF50" alt="Total Downloads"/>
   </a>
-  <a href="https://github.com/MaheshSharan/FrameX-Android/releases/tag/v1.5.4">
-    <img src="https://img.shields.io/badge/Version-1.5.4-orange?style=for-the-badge&logo=github" alt="Version"/>
+  <a href="https://github.com/MaheshSharan/FrameX-Android/releases/tag/v1.5.7">
+    <img src="https://img.shields.io/badge/Version-1.5.7-orange?style=for-the-badge&logo=github" alt="Version"/>
   </a>
   <a href="https://developer.android.com/about/versions/oreo">
     <img src="https://img.shields.io/badge/API-26%2B-brightgreen?style=for-the-badge&logo=android" alt="Min API"/>
@@ -26,7 +23,30 @@
 </p>
 
 ---
+>  [!NOTE]
+> **Gaming Performance Mode** is optimized specifically for **Android 16** and **Vivo OriginOS/FuntouchOS** devices. For Vivo/iQOO devices, enable the **Vivo Optimization** toggle in Settings (About) first to unlock maximum gaming performance and bypass dynamic thermal downclocking. Behavior on other Android skins may vary. Use this feature at your own risk.
 
+> [!IMPORTANT]
+> **Encountering "Parse Failed" or "Unsupported Hardware"?**
+>
+> If thermal monitoring displays **"Parse Failed"** or **"Unsupported Hardware"** on your device:
+>
+> 1. Clone the repository and install the **Debug APK** (`./gradlew installDebug`) or download **[FrameX-v1.5.7-debug.apk](https://github.com/MaheshSharan/FrameX-Android/releases/download/v1.5.7/FrameX_v1.5.7-debug.apk)**. *(Release builds strip diagnostic logs via ProGuard).*
+> 2. Open the **Thermal Diagnostics** screen in FrameX.
+> 3. Run the following ADB commands to capture complete diagnostics:
+>
+>    ```bash
+>    # 1. Capture FrameX internal thermal logs
+>    adb logcat -d | grep -E "ThermalMonitor|CmdRunner"
+>
+>    # 2. Capture raw system thermal HAL dump
+>    adb shell dumpsys thermalservice
+>    ```
+>
+>    *(On Windows PowerShell: `adb logcat -d | Select-String -Pattern "ThermalMonitor|CmdRunner"`)*
+> 4. Open a GitHub Issue attaching the outputs above along with your **device model**, **SoC**, and **Android/ROM version**.
+
+---
 ## What it does
 
 FrameX shows a draggable, fully customisable overlay with live system stats on top of any app or game — including full-screen titles.
