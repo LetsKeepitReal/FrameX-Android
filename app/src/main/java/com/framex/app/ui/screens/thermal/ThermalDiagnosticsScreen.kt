@@ -449,12 +449,13 @@ fun ThermalDiagnosticsScreen(
 
                 Spacer(modifier = Modifier.height(14.dp))
 
-                val activeSeries = remember(selectedGraphMode, filteredSnapshots) {
+                val themeAccent = MaterialTheme.colorScheme.primary
+                val activeSeries = remember(selectedGraphMode, filteredSnapshots, themeAccent) {
                     val fpsRef = (filteredSnapshots.maxOfOrNull { it.state.fps } ?: 60).coerceAtLeast(30).toFloat()
                     val tempRef = (filteredSnapshots.map { it.state.thermalCpuC } + filteredSnapshots.map { it.state.thermalSkinC })
                         .maxOrNull()?.coerceAtLeast(40f) ?: 80f
                     val jankRef = (filteredSnapshots.maxOfOrNull { it.state.jankyFrames.toFloat() } ?: 10f).coerceAtLeast(10f)
-                    seriesForMode(selectedGraphMode, fpsRef, tempRef, jankRef)
+                    seriesForMode(selectedGraphMode, fpsRef, tempRef, jankRef, themeAccent)
                 }
                 GraphLegend(series = activeSeries, modifier = Modifier.padding(bottom = 10.dp))
 

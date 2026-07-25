@@ -49,15 +49,7 @@ fun OverlayPreviewContent(
             Triple(id.storageKey, info.overlayShortLabel, displayValue) to info.icon
         }
 
-    val colors = listOf(
-        MaterialTheme.colorScheme.primary,
-        Color(0xFF60A5FA),
-        Color(0xFF34D399),
-        Color(0xFF2DD4BF),
-        Color(0xFFA78BFA),
-        Color(0xFFFBBF24)
-    )
-    val accentColor = colors.getOrElse(colorIndex) { MaterialTheme.colorScheme.primary }
+    val accentColor = com.framex.app.ui.theme.getAccentColor(colorIndex)
     val fontFamily = if (useMonospace) FontFamily.Monospace else MaterialTheme.typography.bodyMedium.fontFamily
     val textScale = if (overlayScale != 1.0f || textSize == 1) overlayScale else when (textSize) { 0 -> 0.8f; 2 -> 1.2f; else -> 1.0f }
 

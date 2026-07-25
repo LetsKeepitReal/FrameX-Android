@@ -190,7 +190,7 @@ fun DashboardScreen(
                                 text = if (fpsHistory.isNotEmpty()) "${fpsHistory.last()}" else "0",
                                 fontSize = 22.sp,
                                 fontWeight = FontWeight.SemiBold,
-                                color = Color(0xFFE8324A)
+                                color = MaterialTheme.colorScheme.primary
                             )
                             Spacer(modifier = Modifier.width(3.dp))
                             Text(
@@ -210,7 +210,7 @@ fun DashboardScreen(
                             .fillMaxWidth()
                             .height(108.dp)
                     ) {
-                        val lineColor = Color(0xFFE8324A)
+                        val lineColor = MaterialTheme.colorScheme.primary
                         val gridColor = Color.White.copy(alpha = 0.05f)
                         androidx.compose.foundation.Canvas(modifier = Modifier.fillMaxSize()) {
                             val w = size.width

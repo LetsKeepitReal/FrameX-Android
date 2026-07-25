@@ -123,8 +123,8 @@ fun evaluateLikelyCause(
     }
 }
 
-fun seriesForMode(mode: GraphMetricMode, maxFps: Float, maxTemp: Float, maxJank: Float = 10f): List<GraphSeries> {
-    val fpsSeries = GraphSeries("FPS", MutedBlue, "", maxFps, fillArea = true) { it.state.fps.toFloat() }
+fun seriesForMode(mode: GraphMetricMode, maxFps: Float, maxTemp: Float, maxJank: Float = 10f, accentColor: Color = MutedBlue): List<GraphSeries> {
+    val fpsSeries = GraphSeries("FPS", accentColor, "", maxFps, fillArea = true) { it.state.fps.toFloat() }
     val cpuSeries = GraphSeries("CPU", PrimaryRed, "°", maxTemp, fillArea = false) { it.state.thermalCpuC }
     val skinSeries = GraphSeries("Skin", Amber, "°", maxTemp, fillArea = false) { it.state.thermalSkinC }
     val batterySeries = GraphSeries("Battery", MutedGreen, "°", maxTemp, fillArea = false) { it.state.batteryTempC }
