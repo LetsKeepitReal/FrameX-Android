@@ -1,1 +1,11 @@
-<resources><string name="app_name">FrameX</string></resources>
+<resources>
+    <string name="app_name">FrameX</string>
+    <string name="overlay_notif_title_active">FrameX Overlay Active</string>
+    <string name="overlay_notif_title_stopped">FrameX Overlay Stopped</string>
+    <string name="overlay_notif_content_text">Tap to open App</string>
+    <string name="overlay_notif_action_start">Start Overlay</string>
+    <string name="overlay_notif_action_stop">Stop Overlay</string>
+    <string name="overlay_notif_action_open">Open App</string>
+    <string name="overlay_notif_action_exit">Exit App</string>
+</resources>
+

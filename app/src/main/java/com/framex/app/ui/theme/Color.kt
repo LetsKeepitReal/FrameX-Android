@@ -16,3 +16,12 @@ val MutedGreen = Color(0xFF34D399)
 val Teal = Color(0xFF2DD4BF)
 val Purple = Color(0xFFA78BFA)
 val Amber = Color(0xFFFBBF24)
+
+val PresetAccentColors = listOf(
+    PrimaryRed,
+    MutedBlue,
+    MutedGreen,
+    Teal,
+    Purple,
+    Amber
+)

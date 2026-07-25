@@ -90,15 +90,7 @@ fun OverlayCustomizationScreen(
     var selectedMode by remember(savedMode) { mutableStateOf(savedMode) }
     val modes = listOf("Minimal", "Compact", "Expanded")
 
-    val colors = listOf(
-        MaterialTheme.colorScheme.primary,
-        Color(0xFF60A5FA),
-        Color(0xFF34D399),
-        Color(0xFF2DD4BF),
-        Color(0xFFA78BFA),
-        Color(0xFFFBBF24)
-    )
-    val accentColor = colors[colorIndex]
+    val accentColor = com.framex.app.ui.theme.getAccentColor(colorIndex)
     val fontFamily = if (useMonospace) FontFamily.Monospace else MaterialTheme.typography.bodyMedium.fontFamily
     val textScale = overlayScale
 

@@ -190,7 +190,7 @@ fun DashboardScreen(
                                 text = if (fpsHistory.isNotEmpty()) "${fpsHistory.last()}" else "0",
                                 fontSize = 22.sp,
                                 fontWeight = FontWeight.SemiBold,
-                                color = Color(0xFFE8324A)
+                                color = MaterialTheme.colorScheme.primary
                             )
                             Spacer(modifier = Modifier.width(3.dp))
                             Text(
@@ -210,7 +210,7 @@ fun DashboardScreen(
                             .fillMaxWidth()
                             .height(108.dp)
                     ) {
-                        val lineColor = Color(0xFFE8324A)
+                        val lineColor = MaterialTheme.colorScheme.primary
                         val gridColor = Color.White.copy(alpha = 0.05f)
                         androidx.compose.foundation.Canvas(modifier = Modifier.fillMaxSize()) {
                             val w = size.width
@@ -295,6 +295,7 @@ fun DashboardScreen(
                 
                 Spacer(modifier = Modifier.height(24.dp))
                 if (isOverlayRunning) {
+                    val primaryAccent = MaterialTheme.colorScheme.primary
                     Button(
                         onClick = {
                             val intent = Intent(context, OverlayService::class.java).apply {
@@ -302,7 +303,10 @@ fun DashboardScreen(
                             }
                             context.startService(intent)
                         },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color.Red.copy(0.2f), contentColor = Color.Red),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = primaryAccent.copy(alpha = 0.15f),
+                            contentColor = primaryAccent
+                        ),
                         shape = CircleShape,
                         modifier = Modifier.fillMaxWidth().height(56.dp)
                     ) {
@@ -313,7 +317,9 @@ fun DashboardScreen(
                         PrimaryButton(
                             text = "Start Overlay",
                             onClick = {
-                                val intent = Intent(context, OverlayService::class.java)
+                                val intent = Intent(context, OverlayService::class.java).apply {
+                                    action = OverlayService.ACTION_START
+                                }
                                 context.startForegroundService(intent)
                             },
                             icon = { Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(28.dp)) }

@@ -95,14 +95,7 @@ fun AppearanceScreen(
         selectedBgColorIndex != savedBgColorIndex || selectedBorderColorIndex != savedBorderColorIndex ||
         selectedTextColorIndex != savedTextColorIndex
     
-    val colors = listOf(
-        MaterialTheme.colorScheme.primary,
-        Color(0xFF60A5FA),
-        Color(0xFF34D399),
-        Color(0xFF2DD4BF),
-        Color(0xFFA78BFA),
-        Color(0xFFFBBF24)
-    )
+    val colors = com.framex.app.ui.theme.PresetAccentColors
 
     Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         Column(
