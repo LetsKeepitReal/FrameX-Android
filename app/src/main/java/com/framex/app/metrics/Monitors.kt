@@ -437,6 +437,7 @@ class ThermalMonitor @Inject constructor(
             val state = if (shizukuReady) {
                 try {
                     val output = shizukuManager.getThermalTemperatures()
+                    com.framex.app.utils.FrameXLog.d("ThermalMonitor", "Raw output len=${output.length}, startsWith=${output.take(60).replace("\n", "\\n")}")
                     if (output.isBlank()) {
                         consecutiveFailures++
                         if (consecutiveFailures <= 3 && lastGoodState != null) {
@@ -452,6 +453,7 @@ class ThermalMonitor @Inject constructor(
                         }
                     } else {
                         val parsed = ThermalServiceParser.parse(output)
+                        com.framex.app.utils.FrameXLog.d("ThermalMonitor", "Parsed result: entryCount=${parsed?.entryCount}, cpu=${parsed?.cpuC}, gpu=${parsed?.gpuC}, skin=${parsed?.skinC}, battery=${parsed?.batteryC}, halNotReady=${parsed?.halNotReady}")
                         if (parsed == null || parsed.entryCount == 0) {
                             consecutiveFailures++
                             if (consecutiveFailures <= 3 && lastGoodState != null) {

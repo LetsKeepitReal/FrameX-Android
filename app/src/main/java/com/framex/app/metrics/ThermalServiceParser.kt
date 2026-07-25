@@ -27,7 +27,7 @@ internal object ThermalServiceParser {
             get() = cpuC != null || gpuC != null || skinC != null || npuC != null || batteryC != null
     }
 
-    private val blockRegex = Regex("""Temperature\{([^}]*)\}""")
+    private val blockRegex = Regex("""Temperature\{([^}]*mValue[^}]*)\}""")
     private val valueRegex = Regex("""mValue\s*=\s*(-?[0-9.]+)""")
     private val typeRegex = Regex("""mType\s*=\s*(\d+)""")
     private val nameRegex = Regex("""mName\s*=\s*([^\s,}]+)""")
@@ -41,9 +41,13 @@ internal object ThermalServiceParser {
     fun parse(output: String): Result? {
         if (output.isBlank()) return null
 
-        val halSection = output
-            .substringAfter("Current temperatures from HAL:", missingDelimiterValue = "")
-            .substringBefore("Current cooling devices")
+        val halSection = if (output.contains("Current temperatures from HAL:")) {
+            output.substringAfter("Current temperatures from HAL:")
+                .substringBefore("Current cooling devices")
+                .substringBefore("Temperature static thresholds")
+        } else {
+            ""
+        }
         val section = if (halSection.isNotBlank()) halSection else output
 
         var cpu: Float? = null
