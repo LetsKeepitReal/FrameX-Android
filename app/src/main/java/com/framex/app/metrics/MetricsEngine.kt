@@ -44,6 +44,7 @@ data class MetricsState(
     // culprit when a frame drop isn't explained by thermal or frequency alone.
     val topProcessName: String? = null,
     val topProcessCpuPercent: Float = 0f,
+    val topProcesses: List<CpuInfoTopParser.TopProcess> = emptyList(),
     val topProcessReadStatus: MetricReadStatus = MetricReadStatus.Loading
 )
 
@@ -204,6 +205,7 @@ class MetricsEngine @Inject constructor(
                         _metricsState.value = _metricsState.value.copy(
                             topProcessName = if (top.readStatus == MetricReadStatus.Ok) top.name else null,
                             topProcessCpuPercent = top.cpuPercent,
+                            topProcesses = if (top.readStatus == MetricReadStatus.Ok) top.topProcesses else emptyList(),
                             topProcessReadStatus = top.readStatus
                         )
                     }

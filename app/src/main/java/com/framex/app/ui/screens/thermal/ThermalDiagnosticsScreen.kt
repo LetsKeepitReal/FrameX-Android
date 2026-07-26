@@ -366,11 +366,11 @@ fun ThermalDiagnosticsScreen(
                 }
                 Spacer(modifier = Modifier.height(12.dp))
                 Row(modifier = Modifier.fillMaxWidth()) {
-                    ReadingCard(
-                        label = "TOP PROCESS",
-                        value = getTopProcessDisplayValue(metricsState.topProcessName, metricsState.topProcessCpuPercent, metricsState.topProcessReadStatus),
-                        delta30s = 0f,
-                        peakVal = 0f,
+                    com.framex.app.ui.screens.thermal.components.TopProcessCard(
+                        topProcesses = metricsState.topProcesses,
+                        readStatus = metricsState.topProcessReadStatus,
+                        topProcessName = metricsState.topProcessName,
+                        topProcessCpuPercent = metricsState.topProcessCpuPercent,
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
@@ -466,13 +466,12 @@ fun ThermalDiagnosticsScreen(
 
                 Spacer(modifier = Modifier.height(14.dp))
 
-                val themeAccent = MaterialTheme.colorScheme.primary
-                val activeSeries = remember(selectedGraphMode, filteredSnapshots, themeAccent) {
+                val activeSeries = remember(selectedGraphMode, filteredSnapshots) {
                     val fpsRef = (filteredSnapshots.maxOfOrNull { it.state.fps } ?: 60).coerceAtLeast(30).toFloat()
                     val tempRef = (filteredSnapshots.map { it.state.thermalCpuC } + filteredSnapshots.map { it.state.thermalSkinC })
                         .maxOrNull()?.coerceAtLeast(40f) ?: 80f
                     val jankRef = (filteredSnapshots.maxOfOrNull { it.state.jankyFrames.toFloat() } ?: 10f).coerceAtLeast(10f)
-                    seriesForMode(selectedGraphMode, fpsRef, tempRef, jankRef, themeAccent)
+                    seriesForMode(selectedGraphMode, fpsRef, tempRef, jankRef)
                 }
                 GraphLegend(series = activeSeries, modifier = Modifier.padding(bottom = 10.dp))
 

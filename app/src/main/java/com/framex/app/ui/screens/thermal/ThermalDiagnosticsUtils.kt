@@ -123,13 +123,13 @@ fun evaluateLikelyCause(
     }
 }
 
-fun seriesForMode(mode: GraphMetricMode, maxFps: Float, maxTemp: Float, maxJank: Float = 10f, accentColor: Color = MutedBlue): List<GraphSeries> {
-    val fpsSeries = GraphSeries("FPS", accentColor, "", maxFps, fillArea = true) { it.state.fps.toFloat() }
-    val cpuSeries = GraphSeries("CPU", PrimaryRed, "°", maxTemp, fillArea = false) { it.state.thermalCpuC }
-    val skinSeries = GraphSeries("Skin", Amber, "°", maxTemp, fillArea = false) { it.state.thermalSkinC }
-    val batterySeries = GraphSeries("Battery", MutedGreen, "°", maxTemp, fillArea = false) { it.state.batteryTempC }
-    val jankSeries = GraphSeries("Jank", Color(0xFFFB7185), "", maxJank, fillArea = false) { it.state.jankyFrames.toFloat() }
-    val topProcessSeries = GraphSeries("Top Process", Teal, "%", 100f, fillArea = false) { it.state.topProcessCpuPercent }
+fun seriesForMode(mode: GraphMetricMode, maxFps: Float, maxTemp: Float, maxJank: Float = 10f): List<GraphSeries> {
+    val fpsSeries = GraphSeries("FPS", Color(0xFF38BDF8), "", maxFps, fillArea = true) { it.state.fps.toFloat() }
+    val cpuSeries = GraphSeries("CPU", Color(0xFFFF2E4D), "°", maxTemp, fillArea = false) { it.state.thermalCpuC }
+    val skinSeries = GraphSeries("Skin", Color(0xFFFFB703), "°", maxTemp, fillArea = false) { it.state.thermalSkinC }
+    val batterySeries = GraphSeries("Battery", Color(0xFF06D6A0), "°", maxTemp, fillArea = false) { it.state.batteryTempC }
+    val jankSeries = GraphSeries("Jank", Color(0xFFEF476F), "", maxJank, fillArea = false) { it.state.jankyFrames.toFloat() }
+    val topProcessSeries = GraphSeries("Top Process", Color(0xFFFF7300), "%", 100f, fillArea = false) { it.state.topProcessCpuPercent }
 
     return when (mode) {
         GraphMetricMode.FPS_THERMAL -> listOf(cpuSeries, skinSeries, fpsSeries)

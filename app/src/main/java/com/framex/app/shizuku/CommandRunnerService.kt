@@ -188,22 +188,89 @@ class CommandRunnerService(private val context: Context) : ICommandRunner.Stub()
         return if (dump.contains("Temperature{") || dump.contains("mValue=")) dump else null
     }
 
+    private data class CachedThermalPath(val typeFile: java.io.File, val tempFile: java.io.File)
+    private var cachedThermalPaths: List<CachedThermalPath>? = null
+
     /**
      * Reads raw zone temperatures directly from /sys/class/thermal on devices where
      * neither the IThermalService reflection path nor dumpsys thermalservice expose any
-     * sensor data (HAL not ready / legacy Qualcomm builds, e.g. Galaxy Tab A Lite).
-     * This is the most expensive strategy (shell + a loop over every thermal zone), which
-     * is exactly why it is only ever invoked once discovery has resolved it as the working
-     * strategy for this device, rather than re-attempted every poll tick.
+     * sensor data (HAL not ready / legacy Qualcomm builds).
+     *
+     * Optimizations applied:
+     * 1. Direct JVM File.readText() — eliminates shell executions and process forks completely.
+     * 2. Targeted fallback — if direct reading fails due to permissions, executes a single
+     *    targeted cat command only for the cached paths rather than scanning 80+ zones.
+     * 3. Dynamic path discovery & caching — discovers sensor paths once and caches them.
      */
     private fun readViaSysfs(): String? {
+        val cached = cachedThermalPaths
+        if (!cached.isNullOrEmpty()) {
+            val sb = StringBuilder()
+            var successCount = 0
+            var permissionDeniedCount = 0
+            for (item in cached) {
+                try {
+                    if (item.typeFile.canRead() && item.tempFile.canRead()) {
+                        val type = item.typeFile.readText().trim()
+                        val temp = item.tempFile.readText().trim()
+                        if (type.isNotEmpty() && temp.isNotEmpty()) {
+                            sb.append(type).append(":").append(temp).append("\n")
+                            successCount++
+                        }
+                    } else {
+                        permissionDeniedCount++
+                    }
+                } catch (e: Exception) {
+                    permissionDeniedCount++
+                }
+            }
+
+            if (successCount > 0) {
+                return sb.toString()
+            }
+
+            if (permissionDeniedCount > 0) {
+                val cmdSb = StringBuilder("sh -c '")
+                for (item in cached) {
+                    cmdSb.append("echo \"\$(cat ").append(item.typeFile.absolutePath)
+                        .append(" 2>/dev/null):\$(cat ").append(item.tempFile.absolutePath)
+                        .append(" 2>/dev/null)\"; ")
+                }
+                cmdSb.append("'")
+                val shellResult = executeCommand(cmdSb.toString())
+                if (shellResult.isNotBlank() && shellResult.lines().any { it.contains(":") }) {
+                    return shellResult
+                }
+            }
+
+            // Self-healing: if cached paths failed to yield data, reset cache to rediscover
+            cachedThermalPaths = null
+        }
+
         val sysfsDump = executeCommand(
             "sh -c 'for z in /sys/class/thermal/thermal_zone*; do echo \"\$(cat \$z/type 2>/dev/null):\$(cat \$z/temp 2>/dev/null)\"; done'"
         )
-        val hasValidLine = sysfsDump.lines().any {
+        val validLines = sysfsDump.lines().filter {
             it.contains(":") && it.substringBefore(":").isNotBlank() && it.substringAfter(":").isNotBlank()
         }
-        return if (sysfsDump.isNotBlank() && hasValidLine) sysfsDump else null
+
+        if (sysfsDump.isNotBlank() && validLines.isNotEmpty()) {
+            val discoveredPaths = mutableListOf<CachedThermalPath>()
+            val thermalDir = java.io.File("/sys/class/thermal")
+            val zoneDirs = thermalDir.listFiles { dir, name -> dir.isDirectory && name.startsWith("thermal_zone") } ?: emptyArray()
+            for (dir in zoneDirs) {
+                val typeFile = java.io.File(dir, "type")
+                val tempFile = java.io.File(dir, "temp")
+                if (typeFile.exists() && tempFile.exists()) {
+                    discoveredPaths.add(CachedThermalPath(typeFile, tempFile))
+                }
+            }
+            if (discoveredPaths.isNotEmpty()) {
+                cachedThermalPaths = discoveredPaths
+            }
+            return sysfsDump
+        }
+        return null
     }
 
     override fun suspendPackages(packageNames: Array<out String>?, suspended: Boolean): Int {

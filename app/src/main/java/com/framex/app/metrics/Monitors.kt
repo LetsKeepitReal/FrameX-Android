@@ -523,7 +523,7 @@ class ThermalMonitor @Inject constructor(
                 ThermalState(status = status, readStatus = MetricReadStatus.NoShizuku)
             }
             emit(state)
-            delay(1000)
+            delay(2000)
         }
     }
 }
@@ -582,6 +582,7 @@ class TopProcessMonitor @Inject constructor(
     data class TopProcess(
         val name: String = "",
         val cpuPercent: Float = 0f,
+        val topProcesses: List<CpuInfoTopParser.TopProcess> = emptyList(),
         val readStatus: MetricReadStatus = MetricReadStatus.Loading
     )
 
@@ -596,9 +597,15 @@ class TopProcessMonitor @Inject constructor(
                     if (output.isBlank()) {
                         TopProcess(readStatus = MetricReadStatus.EmptyOutput)
                     } else {
-                        val parsed = CpuInfoTopParser.parseTop(output)
-                        if (parsed != null) {
-                            TopProcess(name = parsed.name, cpuPercent = parsed.cpuPercent, readStatus = MetricReadStatus.Ok)
+                        val parsedList = CpuInfoTopParser.parseTopProcesses(output, limit = 5)
+                        val topOne = parsedList.firstOrNull()
+                        if (topOne != null) {
+                            TopProcess(
+                                name = topOne.name,
+                                cpuPercent = topOne.cpuPercent,
+                                topProcesses = parsedList,
+                                readStatus = MetricReadStatus.Ok
+                            )
                         } else {
                             TopProcess(readStatus = MetricReadStatus.NoData)
                         }
