@@ -36,7 +36,10 @@ class EsportsOptimizationEngine @Inject constructor(
     private var activeGamePackage: String? = null
     private var activeGameUid: Int? = null
     private var initialMinRefreshRate: String? = null
+    private var initialPeakRefreshRate: String? = null
+    private var initialVivoRefreshRateMode: String? = null
     private var initialTouchSpeed: String? = null
+    private var initialVivoTouchPersist: String? = null
     private var initialGameCubeCompetitionState: String? = null
     private var initialGameScreenResolutionSwitch: String? = null
 
@@ -86,9 +89,11 @@ class EsportsOptimizationEngine @Inject constructor(
         var refreshRateLockOk = false
         if (settingsRepository.refreshRateLock.value) {
             initialMinRefreshRate = shizukuManager.executeCommand("settings get system min_refresh_rate")
+            initialPeakRefreshRate = shizukuManager.executeCommand("settings get system peak_refresh_rate")
             shizukuManager.executeCommand("settings put system peak_refresh_rate $maxHz")
             shizukuManager.executeCommand("settings put system min_refresh_rate $maxHz")
             if (isVivo) {
+                initialVivoRefreshRateMode = shizukuManager.executeCommand("settings get global vivo_screen_refresh_rate_mode")
                 // cmd game set --fps and --downscale 0.9 require a specific package — skip during manual activation.
                 if (!packageName.isNullOrBlank()) {
                     shizukuManager.executeCommand("cmd game set --fps ${maxHz.toInt()} --downscale 0.9 $packageName")
@@ -107,10 +112,9 @@ class EsportsOptimizationEngine @Inject constructor(
             initialTouchSpeed = shizukuManager.executeCommand("settings get system touch_response_speed")
             shizukuManager.executeCommand("settings put system touch_response_speed 2")
             if (isVivo) {
+                initialVivoTouchPersist = shizukuManager.executeCommand("settings get system com.vivo.vtouch.persist")
                 val result = shizukuManager.executeCommand("settings put system com.vivo.vtouch.persist 1")
                 touchBoostOk = !result.contains("error", ignoreCase = true)
-                // NOTE: setprop persist.sys.touch.response 2 is intentionally omitted.
-                // OriginOS 6 blocks persist.sys.* writes from ADB shell UID 2000 via SELinux.
             } else {
                 touchBoostOk = true
             }
@@ -149,25 +153,43 @@ class EsportsOptimizationEngine @Inject constructor(
             shizukuManager.executeCommand("cmd game reset $pkg")
             if (settingsRepository.cpuPriorityLock.value) {
                 shizukuManager.executeCommand("cmd activity set-bg-restriction-level --user 0 $pkg adaptive_bucket")
+                shizukuManager.executeCommand("am set-standby-bucket --user 0 $pkg working_set")
             }
         }
 
         if (uid != null && settingsRepository.networkFirewall.value) {
             shizukuManager.executeCommand("cmd netpolicy remove restrict-background-whitelist $uid")
-            shizukuManager.executeCommand("cmd deviceidle unforce")
         }
+        shizukuManager.executeCommand("cmd deviceidle unforce")
 
         shizukuManager.executeCommand("cmd power set-fixed-performance-mode-enabled false")
         // Unlock thermal throttling — restores OEM default thermal management.
         shizukuManager.executeCommand("cmd thermalservice reset")
 
         if (settingsRepository.refreshRateLock.value) {
-            val prev = initialMinRefreshRate
-            if (!prev.isNullOrBlank() && prev != "null") {
-                shizukuManager.executeCommand("settings put system min_refresh_rate $prev")
+            val prevMin = initialMinRefreshRate
+            if (!prevMin.isNullOrBlank() && prevMin != "null") {
+                shizukuManager.executeCommand("settings put system min_refresh_rate $prevMin")
             } else {
                 shizukuManager.executeCommand("settings delete system min_refresh_rate")
             }
+
+            val prevPeak = initialPeakRefreshRate
+            if (!prevPeak.isNullOrBlank() && prevPeak != "null") {
+                shizukuManager.executeCommand("settings put system peak_refresh_rate $prevPeak")
+            } else {
+                shizukuManager.executeCommand("settings delete system peak_refresh_rate")
+            }
+
+            val prevVivoMode = initialVivoRefreshRateMode
+            if (!prevVivoMode.isNullOrBlank() && prevVivoMode != "null") {
+                shizukuManager.executeCommand("settings put global vivo_screen_refresh_rate_mode $prevVivoMode")
+            } else {
+                shizukuManager.executeCommand("settings put global vivo_screen_refresh_rate_mode 0")
+            }
+
+            // Force WindowManagerService / SurfaceFlinger policy recalculation
+            shizukuManager.executeCommand("settings put global user_refresh_rate 0")
         }
 
         if (settingsRepository.touchBoost.value) {
@@ -176,6 +198,13 @@ class EsportsOptimizationEngine @Inject constructor(
                 shizukuManager.executeCommand("settings put system touch_response_speed $prevTouch")
             } else {
                 shizukuManager.executeCommand("settings delete system touch_response_speed")
+            }
+
+            val prevVivoTouch = initialVivoTouchPersist
+            if (!prevVivoTouch.isNullOrBlank() && prevVivoTouch != "null") {
+                shizukuManager.executeCommand("settings put system com.vivo.vtouch.persist $prevVivoTouch")
+            } else {
+                shizukuManager.executeCommand("settings delete system com.vivo.vtouch.persist")
             }
         }
 
@@ -195,6 +224,11 @@ class EsportsOptimizationEngine @Inject constructor(
 
         activeGamePackage = null
         activeGameUid = null
+        initialMinRefreshRate = null
+        initialPeakRefreshRate = null
+        initialVivoRefreshRateMode = null
+        initialTouchSpeed = null
+        initialVivoTouchPersist = null
         initialGameCubeCompetitionState = null
         initialGameScreenResolutionSwitch = null
         // Clear Vivo status — device is no longer in gaming mode

@@ -70,7 +70,7 @@ class GamingModeEngine @Inject constructor(
         "com.google.android.youtube",
         "com.google.android.apps.photos",
         "com.google.android.apps.maps",
-        "com.google.android.gm",                   // Gmail
+        "com.google.android.gm",                    // Gmail
         "com.google.android.apps.messaging",        // Google Messages
         "com.google.android.calendar",
         "com.google.android.googlequicksearchbox",  // Google Search / Assistant
@@ -102,7 +102,7 @@ class GamingModeEngine @Inject constructor(
         "com.vivo.connbase",
         "com.android.systemui",
         "com.android.phone",
-        "com.mediatek.ims"             // VoLTE — kills calls if suspended
+        "com.mediatek.ims"              // VoLTE — kills calls if suspended
     )
 
     val GAMING_DAEMONS = listOf(
@@ -275,7 +275,6 @@ class GamingModeEngine @Inject constructor(
 
                 _state.value = GamingModeState.Enabling(0.5f, "Suspending ${allTargets.size} background apps…")
                 shizukuManager.suspendPackages(allTargets, true)
-                shizukuManager.setAppOpMode(allTargets, 70, 1)
 
                 affectedPkgs.addAll(googleTargets)
                 affectedPkgs.addAll(userTargets)
@@ -330,8 +329,6 @@ class GamingModeEngine @Inject constructor(
         }
     }
 
-
-
     /**
      * Full Gaming Mode deactivation sequence.
      *
@@ -348,8 +345,10 @@ class GamingModeEngine @Inject constructor(
             val allToUnsuspend = (SAFE_TO_SUSPEND + affectedUserPkgs).distinct()
 
             shizukuManager.suspendPackages(allToUnsuspend, false)
-            shizukuManager.setAppOpMode(allToUnsuspend, 70, 0)
             settingsRepository.setGamingAffectedPackages(emptySet())
+
+            // Purge spawned background processes after unsuspending to prevent Vivo PEM battery drain
+            shizukuManager.executeCommand("am kill-all")
 
             esportsOptimizationEngine.revertOptimizations()
 
