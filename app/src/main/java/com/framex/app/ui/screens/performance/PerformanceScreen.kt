@@ -48,6 +48,7 @@ fun PerformanceScreen(
     val googleApps by viewModel.googleApps.collectAsState()
     val metricsState by viewModel.metricsState.collectAsState()
     val vivoOptResult by viewModel.vivoOptimizationResult.collectAsState()
+    val fixedPerformanceMode by viewModel.fixedPerformanceMode.collectAsState()
 
     val nm = remember { context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager }
 
@@ -239,6 +240,15 @@ fun PerformanceScreen(
                         }
                     }
                 )
+            }
+
+            // Fixed Performance Mode Toggle Card
+            item {
+                com.framex.app.ui.screens.performance.sections.FixedPerformanceModeCard(
+                    enabled = fixedPerformanceMode,
+                    onToggle = { viewModel.toggleFixedPerformanceMode(it) }
+                )
+                Spacer(modifier = Modifier.height(24.dp))
             }
 
             // Game Launcher

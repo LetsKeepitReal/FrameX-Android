@@ -71,7 +71,9 @@ class EsportsOptimizationEngine @Inject constructor(
         // 3. Performance Governor Lock + Active Thermal Throttling Override
         // cmd thermalservice override-status 0: empirically verified on Vivo T3 Ultra (ADB shell UID 2000).
         // Locks Android ThermalManager to THERMAL_STATUS_NONE, preventing OEM frame-rate throttling drops.
-        shizukuManager.executeCommand("cmd power set-fixed-performance-mode-enabled true")
+        if (settingsRepository.fixedPerformanceMode.value) {
+            shizukuManager.executeCommand("cmd power set-fixed-performance-mode-enabled true")
+        }
         val thermalOverrideOk = runCatching {
             shizukuManager.executeCommand("cmd thermalservice override-status 0")
             true

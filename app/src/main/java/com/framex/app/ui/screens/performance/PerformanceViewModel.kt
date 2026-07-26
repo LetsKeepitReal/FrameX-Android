@@ -68,6 +68,9 @@ class PerformanceViewModel @Inject constructor(
     val framePacingOverlay = settingsRepository.framePacingOverlay
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
+    val fixedPerformanceMode = settingsRepository.fixedPerformanceMode
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+
     val vivoOptimizationResult = esportsOptimizationEngine.vivoOptimizationResult
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
@@ -76,6 +79,7 @@ class PerformanceViewModel @Inject constructor(
     fun toggleRefreshRateLock(enabled: Boolean) = settingsRepository.setRefreshRateLock(enabled)
     fun toggleTouchBoost(enabled: Boolean) = settingsRepository.setTouchBoost(enabled)
     fun toggleFramePacingOverlay(enabled: Boolean) = settingsRepository.setFramePacingOverlay(enabled)
+    fun toggleFixedPerformanceMode(enabled: Boolean) = settingsRepository.setFixedPerformanceMode(enabled)
 
     private val _userApps = MutableStateFlow<List<AppInfo>>(emptyList())
     val userApps = _userApps.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())

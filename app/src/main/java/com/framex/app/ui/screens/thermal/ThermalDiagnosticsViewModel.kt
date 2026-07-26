@@ -76,8 +76,9 @@ class ThermalDiagnosticsViewModel @Inject constructor(
     }
 
     fun recordedSampleCount(snapshots: List<MetricsEngine.MetricsSnapshot>): Int {
-        val startIndex = sessionLogger.recordingStartIndex
-        return (snapshots.size - startIndex).coerceAtLeast(0)
+        val startMs = sessionLogger.recordingStartTimestampMs
+        if (startMs == 0L) return 0
+        return snapshots.count { it.timestampMs >= startMs }
     }
 
     fun requestShizukuPermission() {

@@ -37,8 +37,8 @@ class SessionLogger @Inject constructor(
     // Snapshot index (into metricsEngine.snapshotHistory) marking where this
     // recording session started, so exporting doesn't include earlier history
     // that predates the user pressing "Start".
-    private var _recordingStartIndex = 0
-    val recordingStartIndex: Int get() = _recordingStartIndex
+    private var _recordingStartTimestampMs: Long = 0L
+    val recordingStartTimestampMs: Long get() = _recordingStartTimestampMs
 
     private val _lastExportedFile = MutableStateFlow<File?>(null)
     val lastExportedFile: StateFlow<File?> = _lastExportedFile.asStateFlow()
@@ -50,7 +50,7 @@ class SessionLogger @Inject constructor(
     private val recordingModules = setOf("thermal", "temp", "cpu", "cpu_cluster", "ram", "top_process")
 
     fun startRecording() {
-        _recordingStartIndex = metricsEngine.snapshotHistory.value.size
+        _recordingStartTimestampMs = System.currentTimeMillis()
         metricsEngine.setScreenOverrideModules(recordingModules, requesterKey = "session_logger")
         _isRecording.value = true
     }
@@ -64,8 +64,9 @@ class SessionLogger @Inject constructor(
      *  and returns a content:// URI ready to hand to a share Intent. Returns null
      *  if there's nothing to export. */
     suspend fun exportToFile(): File? = withContext(Dispatchers.IO) {
+        if (_recordingStartTimestampMs == 0L) return@withContext null
         val all = metricsEngine.snapshotHistory.value
-        val window = if (_recordingStartIndex in all.indices) all.subList(_recordingStartIndex, all.size) else all
+        val window = all.filter { it.timestampMs >= _recordingStartTimestampMs }
         if (window.isEmpty()) return@withContext null
 
         val dir = File(context.filesDir, "session_logs").apply { mkdirs() }
@@ -111,8 +112,8 @@ class SessionLogger @Inject constructor(
     /** Number of samples currently held in the active recording window — lets the UI
      *  show a live "N seconds recorded" counter without exporting. */
     fun currentRecordingCount(): Int {
-        if (!_isRecording.value) return 0
+        if (!_isRecording.value || _recordingStartTimestampMs == 0L) return 0
         val all = metricsEngine.snapshotHistory.value
-        return (all.size - _recordingStartIndex).coerceAtLeast(0)
+        return all.count { it.timestampMs >= _recordingStartTimestampMs }
     }
 }
