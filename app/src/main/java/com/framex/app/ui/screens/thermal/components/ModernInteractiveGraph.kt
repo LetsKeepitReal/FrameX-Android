@@ -2,7 +2,7 @@ package com.framex.app.ui.screens.thermal.components
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -76,11 +76,11 @@ fun ModernInteractiveGraph(
 
     Box(
         modifier = modifier.pointerInput(Unit) {
-            detectDragGestures(
+            detectHorizontalDragGestures(
                 onDragStart = { offset -> touchX = offset.x },
                 onDragEnd = { touchX = null },
                 onDragCancel = { touchX = null },
-                onDrag = { change, _ -> touchX = change.position.x }
+                onHorizontalDrag = { change, _ -> touchX = change.position.x }
             )
         },
         contentAlignment = Alignment.Center

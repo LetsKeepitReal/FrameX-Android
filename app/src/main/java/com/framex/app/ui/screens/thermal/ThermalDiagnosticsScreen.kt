@@ -173,8 +173,8 @@ fun ThermalDiagnosticsScreen(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(horizontal = 20.dp)
-                    .verticalScroll(rememberScrollState()),
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 20.dp),
             ) {
                 // Shizuku CTA Banner if needed
                 if (!isShizukuAvailable || !hasShizukuPermission) {
