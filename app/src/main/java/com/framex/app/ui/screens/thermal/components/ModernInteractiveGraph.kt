@@ -32,14 +32,15 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-// Raised from 0.07f: too faint against the dark background per issue #55 feedback.
-private const val GRID_LINE_ALPHA = 0.16f
 import com.framex.app.metrics.MetricsEngine
 import com.framex.app.ui.screens.thermal.GraphSeries
 import com.framex.app.ui.screens.thermal.TimeWindow
 import com.framex.app.ui.screens.thermal.formatSecondsAgo
 import java.util.Locale
 import kotlin.math.roundToInt
+
+// Raised from 0.07f: too faint against the dark background per issue #55 feedback.
+private const val GRID_LINE_ALPHA = 0.16f
 
 @Composable
 fun GraphLegend(series: List<GraphSeries>, modifier: Modifier = Modifier) {
