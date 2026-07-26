@@ -86,6 +86,28 @@ class SettingsRepository @Inject constructor(
     private val _overlayY = MutableStateFlow(prefs.getInt(KEY_OVERLAY_PORTRAIT_Y, -1))
     val overlayY: StateFlow<Int> = _overlayY.asStateFlow()
 
+    // Thermal Diagnostics graph controls. Stored by enum name so the screen's selections
+    // survive navigating away and back (see issue #55).
+    private val _thermalTimeWindow = MutableStateFlow(
+        prefs.getString(KEY_THERMAL_TIME_WINDOW, null) ?: DEFAULT_THERMAL_TIME_WINDOW
+    )
+    val thermalTimeWindow: StateFlow<String> = _thermalTimeWindow.asStateFlow()
+
+    private val _thermalGraphMode = MutableStateFlow(
+        prefs.getString(KEY_THERMAL_GRAPH_MODE, null) ?: DEFAULT_THERMAL_GRAPH_MODE
+    )
+    val thermalGraphMode: StateFlow<String> = _thermalGraphMode.asStateFlow()
+
+    fun setThermalTimeWindow(windowName: String) {
+        prefs.edit().putString(KEY_THERMAL_TIME_WINDOW, windowName).apply()
+        _thermalTimeWindow.value = windowName
+    }
+
+    fun setThermalGraphMode(modeName: String) {
+        prefs.edit().putString(KEY_THERMAL_GRAPH_MODE, modeName).apply()
+        _thermalGraphMode.value = modeName
+    }
+
     fun setOverlayMode(mode: String) {
         prefs.edit().putString(KEY_OVERLAY_MODE, mode).apply()
         _overlayMode.value = mode
@@ -317,6 +339,10 @@ class SettingsRepository @Inject constructor(
 
     companion object {
         private const val KEY_OVERLAY_MODE = "overlay_mode"
+        private const val KEY_THERMAL_TIME_WINDOW = "thermal_time_window"
+        private const val KEY_THERMAL_GRAPH_MODE = "thermal_graph_mode"
+        private const val DEFAULT_THERMAL_TIME_WINDOW = "SEC_60"
+        private const val DEFAULT_THERMAL_GRAPH_MODE = "FPS_THERMAL"
         private const val KEY_ENABLED_MODULES = "enabled_modules"
         private const val KEY_MODULE_ORDER = "module_order"
         private const val MODULE_ORDER_DELIMITER = ","

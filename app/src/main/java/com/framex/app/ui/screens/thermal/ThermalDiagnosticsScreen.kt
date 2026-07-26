@@ -48,11 +48,16 @@ import java.util.Locale
 @Composable
 private fun dropdownFieldColors(): TextFieldColors =
     ExposedDropdownMenuDefaults.outlinedTextFieldColors(
-        focusedBorderColor = MaterialTheme.colorScheme.primary,
+        // These fields are readOnly selectors, not text entry — Compose's
+        // ExposedDropdownMenuBox keeps the field focused after a selection closes the
+        // menu, so a focus-driven border color was getting stuck "on" indefinitely
+        // (issue #55). Using the same color for focused/unfocused removes that stuck
+        // highlight without fighting the focus system.
+        focusedBorderColor = Color.White.copy(alpha = 0.15f),
         unfocusedBorderColor = Color.White.copy(alpha = 0.15f),
         disabledBorderColor = Color.White.copy(alpha = 0.08f),
         errorBorderColor = MaterialTheme.colorScheme.primary,
-        focusedLabelColor = MaterialTheme.colorScheme.primary,
+        focusedLabelColor = Color.Gray,
         unfocusedLabelColor = Color.Gray,
         disabledLabelColor = Color.Gray,
         errorLabelColor = MaterialTheme.colorScheme.primary,
@@ -95,8 +100,18 @@ fun ThermalDiagnosticsScreen(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    var selectedWindow by remember { mutableStateOf(TimeWindow.SEC_60) }
-    var selectedGraphMode by remember { mutableStateOf(GraphMetricMode.FPS_THERMAL) }
+    val persistedTimeWindowName by viewModel.thermalTimeWindow.collectAsState()
+    val persistedGraphModeName by viewModel.thermalGraphMode.collectAsState()
+    var selectedWindow by remember(persistedTimeWindowName) {
+        mutableStateOf(
+            runCatching { TimeWindow.valueOf(persistedTimeWindowName) }.getOrDefault(TimeWindow.SEC_60)
+        )
+    }
+    var selectedGraphMode by remember(persistedGraphModeName) {
+        mutableStateOf(
+            runCatching { GraphMetricMode.valueOf(persistedGraphModeName) }.getOrDefault(GraphMetricMode.FPS_THERMAL)
+        )
+    }
     var timeDropdownExpanded by remember { mutableStateOf(false) }
     var modeDropdownExpanded by remember { mutableStateOf(false) }
     var isSensorDetailsExpanded by remember { mutableStateOf(false) }
@@ -404,6 +419,7 @@ fun ThermalDiagnosticsScreen(
                                     text = { Text(window.label, fontSize = 13.sp, color = Color.White) },
                                     onClick = {
                                         selectedWindow = window
+                                        viewModel.setThermalTimeWindow(window)
                                         timeDropdownExpanded = false
                                     }
                                 )
@@ -439,6 +455,7 @@ fun ThermalDiagnosticsScreen(
                                     text = { Text(mode.label, fontSize = 13.sp, color = Color.White) },
                                     onClick = {
                                         selectedGraphMode = mode
+                                        viewModel.setThermalGraphMode(mode)
                                         modeDropdownExpanded = false
                                     }
                                 )

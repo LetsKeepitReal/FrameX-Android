@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import com.framex.app.metrics.MetricsEngine
 import com.framex.app.metrics.MetricsState
 import com.framex.app.metrics.SessionLogger
+import com.framex.app.repository.SettingsRepository
 import com.framex.app.shizuku.ShizukuManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
@@ -19,7 +20,8 @@ import javax.inject.Inject
 class ThermalDiagnosticsViewModel @Inject constructor(
     private val metricsEngine: MetricsEngine,
     private val sessionLogger: SessionLogger,
-    private val shizukuManager: ShizukuManager
+    private val shizukuManager: ShizukuManager,
+    private val settingsRepository: SettingsRepository
 ) : ViewModel() {
 
     val metricsState = metricsEngine.metricsState
@@ -36,6 +38,22 @@ class ThermalDiagnosticsViewModel @Inject constructor(
 
     val hasShizukuPermission = shizukuManager.hasPermission
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+
+    // Persisted graph controls (issue #55): survive navigating away from and back to
+    // this screen, unlike the previous remember{}-scoped selection.
+    val thermalTimeWindow = settingsRepository.thermalTimeWindow
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), settingsRepository.thermalTimeWindow.value)
+
+    val thermalGraphMode = settingsRepository.thermalGraphMode
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), settingsRepository.thermalGraphMode.value)
+
+    fun setThermalTimeWindow(window: TimeWindow) {
+        settingsRepository.setThermalTimeWindow(window.name)
+    }
+
+    fun setThermalGraphMode(mode: GraphMetricMode) {
+        settingsRepository.setThermalGraphMode(mode.name)
+    }
 
     init {
         metricsEngine.setScreenOverrideModules(

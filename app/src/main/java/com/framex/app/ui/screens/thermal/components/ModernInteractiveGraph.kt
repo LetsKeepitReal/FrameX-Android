@@ -31,6 +31,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+
+// Raised from 0.07f: too faint against the dark background per issue #55 feedback.
+private const val GRID_LINE_ALPHA = 0.16f
 import com.framex.app.metrics.MetricsEngine
 import com.framex.app.ui.screens.thermal.GraphSeries
 import com.framex.app.ui.screens.thermal.TimeWindow
@@ -128,7 +131,7 @@ fun ModernInteractiveGraph(
                     val y = topPadding + graphHeight * (1f - ratio)
 
                     drawLine(
-                        color = Color.White.copy(alpha = 0.07f),
+                        color = Color.White.copy(alpha = GRID_LINE_ALPHA),
                         start = Offset(leftPadding, y),
                         end = Offset(leftPadding + graphWidth, y),
                         strokeWidth = 1f,
