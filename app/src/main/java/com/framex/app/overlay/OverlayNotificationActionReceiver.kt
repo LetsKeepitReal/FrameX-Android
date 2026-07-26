@@ -4,7 +4,9 @@ import android.app.NotificationManager
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.os.Process
 import com.framex.app.gaming.GamingModeEngine
+import com.framex.app.repository.SettingsRepository
 import com.framex.app.utils.FrameXLog
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
@@ -31,6 +33,9 @@ class OverlayNotificationActionReceiver : BroadcastReceiver() {
 
     @Inject
     lateinit var gamingModeEngine: GamingModeEngine
+
+    @Inject
+    lateinit var settingsRepository: SettingsRepository
 
     override fun onReceive(context: Context, intent: Intent) {
         val now = android.os.SystemClock.elapsedRealtime()
@@ -76,14 +81,30 @@ class OverlayNotificationActionReceiver : BroadcastReceiver() {
     }
 
     /**
-     * Fully tears down FrameX: deactivates Gaming Mode first (restoring suspended apps and
-     * DND) so we never leave the device in a degraded state, then stops the overlay service
-     * and cancels the notification.
+     * Fully tears down FrameX: cancels the notification and stops the overlay service
+     * immediately (so the user sees FrameX gone from the shade and screen right away),
+     * then deactivates Gaming Mode gracefully in the background before force-stopping the
+     * whole process.
      *
-     * Uses a receiver-scoped coroutine rather than blocking, since Gaming Mode teardown does
-     * Shizuku IPC and must never run on the main thread (see GamingModeEngine.disableGamingMode).
+     * Ordering matters here to avoid two race conditions:
+     *  1. We must call stopService(), never startService(), to tear down the overlay
+     *     service. startService() on an already-stopped (or stopping) instance triggers a
+     *     fresh onCreate(), which unconditionally re-shows the overlay -- that was the bug
+     *     where the overlay reappeared 2-3s after Exit App.
+     *  2. Gaming Mode teardown does Shizuku IPC and must not block onReceive/the main
+     *     thread, but it must still complete (restoring suspended apps, disabling DND)
+     *     before the process is killed, or the device is left in a degraded state.
      */
     private fun exitApp(context: Context) {
+        overlayManager.hideOverlay()
+        settingsRepository.setOverlayWasRunning(false)
+
+        val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        manager.cancel(OverlayService.NOTIFICATION_ID)
+
+        val stopIntent = Intent(context, OverlayService::class.java)
+        context.stopService(stopIntent)
+
         val receiverScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         receiverScope.launch {
             try {
@@ -92,17 +113,9 @@ class OverlayNotificationActionReceiver : BroadcastReceiver() {
                 }
             } catch (e: Exception) {
                 FrameXLog.e("Failed to deactivate Gaming Mode during Exit App", e)
+            } finally {
+                Process.killProcess(Process.myPid())
             }
-
-            overlayManager.hideOverlay()
-
-            val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            manager.cancel(OverlayService.NOTIFICATION_ID)
-
-            val stopIntent = Intent(context, OverlayService::class.java).apply {
-                action = OverlayService.ACTION_STOP
-            }
-            context.startService(stopIntent)
         }
     }
 
