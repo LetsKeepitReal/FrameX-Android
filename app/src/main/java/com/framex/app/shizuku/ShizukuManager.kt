@@ -9,6 +9,8 @@ import kotlinx.coroutines.withContext
 import rikka.shizuku.Shizuku
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.withTimeoutOrNull
 import android.content.ComponentName
 import android.content.ServiceConnection
 import android.os.IBinder
@@ -28,6 +30,7 @@ class ShizukuManager @Inject constructor() {
     // Guard flag prevents duplicate bindUserService calls during async connection setup.
     @Volatile private var isConnecting = false
     private var userServiceConnection: android.content.ServiceConnection? = null
+    private var pendingConnection: CompletableDeferred<ICommandRunner?>? = null
 
     private val _hasPermission = MutableStateFlow(false)
     val hasPermission: StateFlow<Boolean> = _hasPermission.asStateFlow()
@@ -108,16 +111,21 @@ class ShizukuManager @Inject constructor() {
         }
     }
 
+    private suspend fun awaitCommandRunner(): ICommandRunner? {
+        commandRunner?.let { return it }
+        connectUserService()
+        val deferred = pendingConnection ?: return commandRunner
+        return withTimeoutOrNull(BIND_TIMEOUT_MS) { deferred.await() }
+    }
+
     suspend fun executeCommand(command: String): String {
         if (!_isShizukuAvailable.value || !_hasPermission.value) {
             com.framex.app.utils.FrameXLog.w("executeCommand called when Shizuku is unavailable or permitted")
             return ""
         }
         return commandMutex.withLock {
-            val runner = commandRunner
-            if (runner == null) {
-                com.framex.app.utils.FrameXLog.w("CommandRunner service null, attempting reconnect")
-                connectUserService()
+            val runner = awaitCommandRunner() ?: run {
+                com.framex.app.utils.FrameXLog.w("CommandRunner unavailable after bind attempt in executeCommand")
                 return@withLock ""
             }
             try {
@@ -137,9 +145,8 @@ class ShizukuManager @Inject constructor() {
             return ""
         }
         return commandMutex.withLock {
-            val runner = commandRunner ?: run {
-                com.framex.app.utils.FrameXLog.w("CommandRunner service null in getThermalTemperatures")
-                connectUserService()
+            val runner = awaitCommandRunner() ?: run {
+                com.framex.app.utils.FrameXLog.w("CommandRunner unavailable after bind attempt in getThermalTemperatures")
                 return@withLock ""
             }
             try {
@@ -159,9 +166,8 @@ class ShizukuManager @Inject constructor() {
             return 0
         }
         return commandMutex.withLock {
-            val runner = commandRunner ?: run {
-                com.framex.app.utils.FrameXLog.w("CommandRunner service null in suspendPackages")
-                connectUserService()
+            val runner = awaitCommandRunner() ?: run {
+                com.framex.app.utils.FrameXLog.w("CommandRunner unavailable after bind attempt in suspendPackages")
                 return@withLock 0
             }
             try {
@@ -181,9 +187,8 @@ class ShizukuManager @Inject constructor() {
             return 0
         }
         return commandMutex.withLock {
-            val runner = commandRunner ?: run {
-                com.framex.app.utils.FrameXLog.w("CommandRunner service null in setAppOpMode")
-                connectUserService()
+            val runner = awaitCommandRunner() ?: run {
+                com.framex.app.utils.FrameXLog.w("CommandRunner unavailable after bind attempt in setAppOpMode")
                 return@withLock 0
             }
             try {
@@ -210,21 +215,36 @@ class ShizukuManager @Inject constructor() {
             _hasPermission.value = false
             commandRunner = null
             isConnecting = false
+            pendingConnection?.complete(null)
+            pendingConnection = null
             return
         }
 
         isConnecting = true
+        val deferred = CompletableDeferred<ICommandRunner?>()
+        pendingConnection = deferred
+
+        com.framex.app.utils.FrameXLog.w("connectUserService: attempting bindUserService")
+
         val args = Shizuku.UserServiceArgs(
             ComponentName("com.framex.app", CommandRunnerService::class.java.name)
         ).daemon(false).processNameSuffix("runner")
+
         val connection = object : android.content.ServiceConnection {
             override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
-                commandRunner = ICommandRunner.Stub.asInterface(service)
+                com.framex.app.utils.FrameXLog.w("connectUserService: onServiceConnected")
+                val runner = ICommandRunner.Stub.asInterface(service)
+                commandRunner = runner
                 isConnecting = false
+                pendingConnection?.complete(runner)
+                pendingConnection = null
             }
             override fun onServiceDisconnected(name: ComponentName?) {
+                com.framex.app.utils.FrameXLog.w("connectUserService: onServiceDisconnected")
                 commandRunner = null
                 isConnecting = false
+                pendingConnection?.complete(null)
+                pendingConnection = null
                 if (_isShizukuAvailable.value && _hasPermission.value) {
                     connectUserService()
                 }
@@ -237,6 +257,8 @@ class ShizukuManager @Inject constructor() {
             com.framex.app.utils.FrameXLog.e("bindUserService failed", e)
             isConnecting = false
             _isShizukuAvailable.value = false
+            pendingConnection?.complete(null)
+            pendingConnection = null
         }
     }
 
@@ -253,9 +275,12 @@ class ShizukuManager @Inject constructor() {
         userServiceConnection = null
         commandRunner = null
         isConnecting = false
+        pendingConnection?.complete(null)
+        pendingConnection = null
     }
 
     companion object {
         const val REQUEST_CODE_PERMISSION = 1001
+        private const val BIND_TIMEOUT_MS = 3000L
     }
 }
