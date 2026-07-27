@@ -199,6 +199,20 @@ class ShizukuManager @Inject constructor() {
 
     private fun connectUserService() {
         if (commandRunner != null || isConnecting) return
+
+        // OnBinderDeadListener only fires on a graceful Shizuku shutdown.
+        // When the OS kills Shizuku abruptly (e.g. Nothing OS "adj 905: remove task" SIGKILL),
+        // the binder death signal never arrives, leaving _isShizukuAvailable=true with a dead binder.
+        // pingBinder() is the only reliable way to catch this case before we attempt binding.
+        if (!runCatching { Shizuku.pingBinder() }.getOrDefault(false)) {
+            com.framex.app.utils.FrameXLog.w("Shizuku daemon dead (OS-level kill detected via pingBinder). Halting reconnect.")
+            _isShizukuAvailable.value = false
+            _hasPermission.value = false
+            commandRunner = null
+            isConnecting = false
+            return
+        }
+
         isConnecting = true
         val args = Shizuku.UserServiceArgs(
             ComponentName("com.framex.app", CommandRunnerService::class.java.name)
@@ -222,6 +236,7 @@ class ShizukuManager @Inject constructor() {
         } catch (e: Exception) {
             com.framex.app.utils.FrameXLog.e("bindUserService failed", e)
             isConnecting = false
+            _isShizukuAvailable.value = false
         }
     }
 
