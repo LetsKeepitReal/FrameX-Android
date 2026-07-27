@@ -357,23 +357,6 @@ fun AboutScreen(
                 )
             }
 
-    var downloadedApkFile by remember { mutableStateOf<java.io.File?>(null) }
-
-    LaunchedEffect(Unit) {
-        com.framex.app.update.UpdateInstallerBus.installEvents.collect { result ->
-            when (result) {
-                is com.framex.app.update.InstallResult.SignatureMismatch -> {
-                    signatureErrorMessage = result.errorMessage
-                    updateInfoState = null
-                }
-                is com.framex.app.update.InstallResult.PermissionRequired -> {
-                    viewModel.updateInstaller.openUnknownAppSourcesSettings()
-                }
-                else -> {}
-            }
-        }
-    }
-
     LaunchedEffect(downloadState) {
         if (downloadState is com.framex.app.update.DownloadState.Completed) {
             val apkFile = (downloadState as com.framex.app.update.DownloadState.Completed).apkFile
@@ -422,7 +405,8 @@ fun AboutScreen(
                     onUninstallClicked = {
                         scope.launch {
                             val targetVer = updateInfoState?.versionName ?: com.framex.app.BuildConfig.VERSION_NAME
-                            viewModel.updateInstaller.handleSignatureMismatch(downloadedApkFile, targetVer) {
+                            val apkFile = viewModel.updateRepository.getCachedApkIfValid(targetVer, updateInfoState?.sha256)
+                            viewModel.updateInstaller.handleSignatureMismatch(apkFile, targetVer) {
                                 signatureErrorMessage = null
                                 updateInfoState = null
                             }

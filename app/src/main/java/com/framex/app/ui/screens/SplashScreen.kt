@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import com.framex.app.repository.SettingsRepository
 import com.framex.app.ui.components.SignatureMismatchDialog
 import com.framex.app.ui.components.UpdateDialog
@@ -233,7 +234,8 @@ fun SplashScreen(
                 onUninstallClicked = {
                     scope.launch {
                         val targetVer = updateInfoState?.versionName ?: com.framex.app.BuildConfig.VERSION_NAME
-                        viewModel.updateInstaller.handleSignatureMismatch(downloadedApkFile, targetVer) {
+                        val apkFile = viewModel.updateRepository.getCachedApkIfValid(targetVer, updateInfoState?.sha256)
+                        viewModel.updateInstaller.handleSignatureMismatch(apkFile, targetVer) {
                             signatureErrorMessage = null
                             updateInfoState = null
                             proceedToNextScreen()
