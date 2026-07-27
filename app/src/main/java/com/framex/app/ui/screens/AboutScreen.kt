@@ -58,6 +58,7 @@ class AboutViewModel @Inject constructor(
 ) : ViewModel() {
     val vivoOptEnabled = settingsRepository.vivoOptEnabled
     val autoUpdateCheckEnabled = settingsRepository.autoUpdateCheckEnabled
+    val downloadState = updateRepository.downloadState
 
     fun setVivoOptEnabled(enabled: Boolean) {
         settingsRepository.setVivoOptEnabled(enabled)
@@ -78,12 +79,11 @@ fun AboutScreen(
     val scope = rememberCoroutineScope()
 
     val autoUpdateEnabled by viewModel.autoUpdateCheckEnabled.collectAsState()
+    val downloadState by viewModel.downloadState.collectAsState()
     var isCheckingUpdate by remember { mutableStateOf(false) }
     var updateInfoState by remember { mutableStateOf<com.framex.app.update.AppUpdateInfo?>(null) }
-    var downloadState by remember { mutableStateOf<com.framex.app.update.DownloadState>(com.framex.app.update.DownloadState.Idle) }
     var signatureErrorMessage by remember { mutableStateOf<String?>(null) }
     var statusMessage by remember { mutableStateOf<String?>(null) }
-    var downloadJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
 
     val packageInfo = try {
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
@@ -374,6 +374,24 @@ fun AboutScreen(
         }
     }
 
+    LaunchedEffect(downloadState) {
+        if (downloadState is com.framex.app.update.DownloadState.Completed) {
+            val apkFile = (downloadState as com.framex.app.update.DownloadState.Completed).apkFile
+            viewModel.updateInstaller.installApk(apkFile) { installRes ->
+                when (installRes) {
+                    is com.framex.app.update.InstallResult.PermissionRequired -> {
+                        viewModel.updateInstaller.openUnknownAppSourcesSettings()
+                    }
+                    is com.framex.app.update.InstallResult.SignatureMismatch -> {
+                        signatureErrorMessage = installRes.errorMessage
+                        updateInfoState = null
+                    }
+                    else -> {}
+                }
+            }
+        }
+    }
+
             // Update Dialog
             updateInfoState?.let { info ->
                 com.framex.app.ui.components.UpdateDialog(
@@ -385,39 +403,14 @@ fun AboutScreen(
                         statusMessage = "Please allow unknown app installation, then tap Download & Install again."
                     },
                     onDownloadAndInstallClicked = {
-                        downloadJob = scope.launch {
-                            viewModel.updateRepository.downloadUpdateApk(info.downloadUrl, info.versionName, info.sha256)
-                                .collect { state ->
-                                    downloadState = state
-                                    if (state is com.framex.app.update.DownloadState.Failed || state is com.framex.app.update.DownloadState.Completed) {
-                                        downloadJob = null
-                                    }
-                                    if (state is com.framex.app.update.DownloadState.Completed) {
-                                        downloadedApkFile = state.apkFile
-                                        viewModel.updateInstaller.installApk(state.apkFile) { installRes ->
-                                            when (installRes) {
-                                                is com.framex.app.update.InstallResult.PermissionRequired -> {
-                                                    viewModel.updateInstaller.openUnknownAppSourcesSettings()
-                                                }
-                                                is com.framex.app.update.InstallResult.SignatureMismatch -> {
-                                                    signatureErrorMessage = installRes.errorMessage
-                                                    updateInfoState = null
-                                                }
-                                                else -> {}
-                                            }
-                                        }
-                                    }
-                                }
-                        }
+                        viewModel.updateRepository.requestDownloadOrResume(info)
                     },
                     onCancelDownload = {
-                        downloadJob?.cancel()
-                        downloadJob = null
-                        downloadState = com.framex.app.update.DownloadState.Idle
+                        viewModel.updateRepository.resetDownloadState()
                     },
                     onRemindLaterClicked = {
                         updateInfoState = null
-                        downloadState = com.framex.app.update.DownloadState.Idle
+                        viewModel.updateRepository.resetDownloadState()
                     }
                 )
             }

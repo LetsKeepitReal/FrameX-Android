@@ -40,6 +40,13 @@ class SplashViewModel @Inject constructor(
 ) : ViewModel() {
     val isOnboardingCompleted = settingsRepository.isOnboardingCompleted
     val autoUpdateCheckEnabled = settingsRepository.autoUpdateCheckEnabled
+    val downloadState = updateRepository.downloadState
+
+    init {
+        viewModelScope.launch(Dispatchers.IO) {
+            updateRepository.cleanupStaleUpdateApks()
+        }
+    }
 }
 
 @Composable
@@ -52,12 +59,11 @@ fun SplashScreen(
 
     val isOnboardingCompleted by viewModel.isOnboardingCompleted.collectAsState()
     val autoUpdateEnabled by viewModel.autoUpdateCheckEnabled.collectAsState()
+    val downloadState by viewModel.downloadState.collectAsState()
 
     var isCheckingUpdates by remember { mutableStateOf(false) }
     var updateInfoState by remember { mutableStateOf<AppUpdateInfo?>(null) }
-    var downloadState by remember { mutableStateOf<DownloadState>(DownloadState.Idle) }
     var signatureErrorMessage by remember { mutableStateOf<String?>(null) }
-    var downloadJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
 
     fun proceedToNextScreen() {
         if (isOnboardingCompleted) {
@@ -164,8 +170,6 @@ fun SplashScreen(
             )
         }
 
-    var downloadedApkFile by remember { mutableStateOf<java.io.File?>(null) }
-
     LaunchedEffect(Unit) {
         com.framex.app.update.UpdateInstallerBus.installEvents.collect { result ->
             when (result) {
@@ -181,6 +185,24 @@ fun SplashScreen(
         }
     }
 
+    LaunchedEffect(downloadState) {
+        if (downloadState is DownloadState.Completed) {
+            val apkFile = (downloadState as DownloadState.Completed).apkFile
+            viewModel.updateInstaller.installApk(apkFile) { installRes ->
+                when (installRes) {
+                    is InstallResult.PermissionRequired -> {
+                        viewModel.updateInstaller.openUnknownAppSourcesSettings()
+                    }
+                    is InstallResult.SignatureMismatch -> {
+                        signatureErrorMessage = installRes.errorMessage
+                        updateInfoState = null
+                    }
+                    else -> {}
+                }
+            }
+        }
+    }
+
         // Update Dialog Over Splash
         updateInfoState?.let { info ->
             UpdateDialog(
@@ -191,39 +213,14 @@ fun SplashScreen(
                     viewModel.updateInstaller.openUnknownAppSourcesSettings()
                 },
                 onDownloadAndInstallClicked = {
-                    downloadJob = scope.launch {
-                        viewModel.updateRepository.downloadUpdateApk(info.downloadUrl, info.versionName, info.sha256)
-                            .collect { state ->
-                                downloadState = state
-                                if (state is DownloadState.Failed || state is DownloadState.Completed) {
-                                    downloadJob = null
-                                }
-                                if (state is DownloadState.Completed) {
-                                    downloadedApkFile = state.apkFile
-                                    viewModel.updateInstaller.installApk(state.apkFile) { installRes ->
-                                        when (installRes) {
-                                            is InstallResult.PermissionRequired -> {
-                                                viewModel.updateInstaller.openUnknownAppSourcesSettings()
-                                            }
-                                            is InstallResult.SignatureMismatch -> {
-                                                signatureErrorMessage = installRes.errorMessage
-                                                updateInfoState = null
-                                            }
-                                            else -> {}
-                                        }
-                                    }
-                                }
-                            }
-                    }
+                    viewModel.updateRepository.requestDownloadOrResume(info)
                 },
                 onCancelDownload = {
-                    downloadJob?.cancel()
-                    downloadJob = null
-                    downloadState = DownloadState.Idle
+                    viewModel.updateRepository.resetDownloadState()
                 },
                 onRemindLaterClicked = {
                     updateInfoState = null
-                    downloadState = DownloadState.Idle
+                    viewModel.updateRepository.resetDownloadState()
                     proceedToNextScreen()
                 }
             )

@@ -3,10 +3,16 @@ package com.framex.app.update
 import android.content.Context
 import com.framex.app.BuildConfig
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.io.File
@@ -39,6 +45,62 @@ sealed class DownloadState {
 class UpdateRepository @Inject constructor(
     @ApplicationContext private val context: Context
 ) {
+    private val _downloadState = MutableStateFlow<DownloadState>(DownloadState.Idle)
+    val downloadState: StateFlow<DownloadState> = _downloadState.asStateFlow()
+
+    private val repositoryScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    fun startDownload(downloadUrl: String, targetVersionName: String, expectedSha256: String?) {
+        val cached = getCachedApkIfValid(targetVersionName, expectedSha256)
+        if (cached != null) {
+            _downloadState.value = DownloadState.Completed(cached)
+            return
+        }
+        repositoryScope.launch {
+            downloadUpdateApk(downloadUrl, targetVersionName, expectedSha256)
+                .collect { state -> _downloadState.value = state }
+        }
+    }
+
+    fun requestDownloadOrResume(info: AppUpdateInfo) {
+        val cached = getCachedApkIfValid(info.versionName, info.sha256)
+        if (cached != null) {
+            _downloadState.value = DownloadState.Completed(cached)
+        } else {
+            startDownload(info.downloadUrl, info.versionName, info.sha256)
+        }
+    }
+
+    fun resetDownloadState() {
+        _downloadState.value = DownloadState.Idle
+    }
+
+    fun getCachedApkIfValid(targetVersionName: String, expectedSha256: String?): File? {
+        val updatesDir = File(context.cacheDir, "updates")
+        val apkFile = File(updatesDir, "FrameX_v$targetVersionName.apk")
+        if (!apkFile.exists()) return null
+        if (expectedSha256.isNullOrBlank()) return apkFile
+        val actualHash = computeSha256(apkFile)
+        if (!actualHash.equals(expectedSha256, ignoreCase = true)) {
+            apkFile.delete()
+            return null
+        }
+        return apkFile
+    }
+
+    fun cleanupStaleUpdateApks() {
+        val updatesDir = File(context.cacheDir, "updates")
+        if (!updatesDir.exists()) return
+        val currentVersion = BuildConfig.VERSION_NAME
+        updatesDir.listFiles { file -> file.name.startsWith("FrameX_v") && file.name.endsWith(".apk") }
+            ?.forEach { file ->
+                val fileVersion = file.name.removePrefix("FrameX_v").removeSuffix(".apk")
+                if (!isVersionHigher(fileVersion, currentVersion)) {
+                    file.delete()
+                }
+            }
+    }
+
     private companion object {
         const val GITHUB_LATEST_RELEASE_URL = "https://api.github.com/repos/MaheshSharan/FrameX-Android/releases/latest"
         const val CONNECT_TIMEOUT_MS = 5000
