@@ -32,6 +32,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -41,12 +42,15 @@ import com.framex.app.R
 
 import androidx.compose.runtime.*
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.ViewModel
 import com.framex.app.device.DeviceDiagnosticManager
 import com.framex.app.repository.SettingsRepository
 import com.framex.app.ui.components.VivoDiagnosticDialog
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.launch
+import java.io.File
 import javax.inject.Inject
 
 @HiltViewModel
@@ -84,6 +88,45 @@ fun AboutScreen(
     var updateInfoState by remember { mutableStateOf<com.framex.app.update.AppUpdateInfo?>(null) }
     var signatureErrorMessage by remember { mutableStateOf<String?>(null) }
     var statusMessage by remember { mutableStateOf<String?>(null) }
+    var pendingInstallApk by remember { mutableStateOf<File?>(null) }
+    var waitingForInstallPermission by remember { mutableStateOf(false) }
+    val lifecycleOwner = LocalLifecycleOwner.current
+
+    fun installDownloadedApk(apkFile: File) {
+        pendingInstallApk = apkFile
+        scope.launch {
+            viewModel.updateInstaller.installApk(apkFile) { installResult ->
+                when (installResult) {
+                    is com.framex.app.update.InstallResult.PermissionRequired -> {
+                        waitingForInstallPermission = true
+                        viewModel.updateInstaller.openUnknownAppSourcesSettings()
+                    }
+                    is com.framex.app.update.InstallResult.SignatureMismatch -> {
+                        signatureErrorMessage = installResult.errorMessage
+                        updateInfoState = null
+                    }
+                    else -> Unit
+                }
+            }
+        }
+    }
+
+    DisposableEffect(lifecycleOwner, pendingInstallApk, waitingForInstallPermission) {
+        val observer = LifecycleEventObserver { _, event ->
+            val apkFile = pendingInstallApk
+            if (
+                event == Lifecycle.Event.ON_RESUME &&
+                waitingForInstallPermission &&
+                apkFile != null &&
+                viewModel.updateInstaller.canInstallPackages()
+            ) {
+                waitingForInstallPermission = false
+                installDownloadedApk(apkFile)
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     val packageInfo = try {
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
@@ -360,18 +403,7 @@ fun AboutScreen(
     LaunchedEffect(downloadState) {
         if (downloadState is com.framex.app.update.DownloadState.Completed) {
             val apkFile = (downloadState as com.framex.app.update.DownloadState.Completed).apkFile
-            viewModel.updateInstaller.installApk(apkFile) { installRes ->
-                when (installRes) {
-                    is com.framex.app.update.InstallResult.PermissionRequired -> {
-                        viewModel.updateInstaller.openUnknownAppSourcesSettings()
-                    }
-                    is com.framex.app.update.InstallResult.SignatureMismatch -> {
-                        signatureErrorMessage = installRes.errorMessage
-                        updateInfoState = null
-                    }
-                    else -> {}
-                }
-            }
+            installDownloadedApk(apkFile)
         }
     }
 

@@ -12,11 +12,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.framex.app.repository.SettingsRepository
@@ -31,6 +34,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.io.File
 import javax.inject.Inject
 
 @HiltViewModel
@@ -65,6 +69,45 @@ fun SplashScreen(
     var isCheckingUpdates by remember { mutableStateOf(false) }
     var updateInfoState by remember { mutableStateOf<AppUpdateInfo?>(null) }
     var signatureErrorMessage by remember { mutableStateOf<String?>(null) }
+    var pendingInstallApk by remember { mutableStateOf<File?>(null) }
+    var waitingForInstallPermission by remember { mutableStateOf(false) }
+    val lifecycleOwner = LocalLifecycleOwner.current
+
+    fun installDownloadedApk(apkFile: File) {
+        pendingInstallApk = apkFile
+        scope.launch {
+            viewModel.updateInstaller.installApk(apkFile) { installResult ->
+                when (installResult) {
+                    is InstallResult.PermissionRequired -> {
+                        waitingForInstallPermission = true
+                        viewModel.updateInstaller.openUnknownAppSourcesSettings()
+                    }
+                    is InstallResult.SignatureMismatch -> {
+                        signatureErrorMessage = installResult.errorMessage
+                        updateInfoState = null
+                    }
+                    else -> Unit
+                }
+            }
+        }
+    }
+
+    DisposableEffect(lifecycleOwner, pendingInstallApk, waitingForInstallPermission) {
+        val observer = LifecycleEventObserver { _, event ->
+            val apkFile = pendingInstallApk
+            if (
+                event == Lifecycle.Event.ON_RESUME &&
+                waitingForInstallPermission &&
+                apkFile != null &&
+                viewModel.updateInstaller.canInstallPackages()
+            ) {
+                waitingForInstallPermission = false
+                installDownloadedApk(apkFile)
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     fun proceedToNextScreen() {
         if (isOnboardingCompleted) {
@@ -189,18 +232,7 @@ fun SplashScreen(
     LaunchedEffect(downloadState) {
         if (downloadState is DownloadState.Completed) {
             val apkFile = (downloadState as DownloadState.Completed).apkFile
-            viewModel.updateInstaller.installApk(apkFile) { installRes ->
-                when (installRes) {
-                    is InstallResult.PermissionRequired -> {
-                        viewModel.updateInstaller.openUnknownAppSourcesSettings()
-                    }
-                    is InstallResult.SignatureMismatch -> {
-                        signatureErrorMessage = installRes.errorMessage
-                        updateInfoState = null
-                    }
-                    else -> {}
-                }
-            }
+            installDownloadedApk(apkFile)
         }
     }
 

@@ -7,7 +7,6 @@ import android.content.pm.PackageInstaller
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
-import com.framex.app.shizuku.ShizukuManager
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -25,19 +24,13 @@ sealed class InstallResult {
 
 @Singleton
 class UpdateInstaller @Inject constructor(
-    @ApplicationContext private val context: Context,
-    private val shizukuManager: ShizukuManager
+    @ApplicationContext private val context: Context
 ) {
-    fun canInstallPackages(): Boolean {
-        if (shizukuManager.isShizukuAvailable.value && shizukuManager.hasPermission.value) {
-            return true
-        }
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+    fun canInstallPackages(): Boolean = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             context.packageManager.canRequestPackageInstalls()
         } else {
             true
         }
-    }
 
     suspend fun installApk(
         apkFile: File,
@@ -50,30 +43,6 @@ class UpdateInstaller @Inject constructor(
             return@withContext
         }
 
-        // Engine A: Shizuku Privileged Direct 1-Tap Installation (Bypasses Unknown Apps Prompt)
-        if (shizukuManager.isShizukuAvailable.value && shizukuManager.hasPermission.value) {
-            val cmd = "cmd package install -r ${apkFile.absolutePath}"
-            val output = shizukuManager.executeCommand(cmd)
-            withContext(Dispatchers.Main) {
-                if (output.contains("Success", ignoreCase = true)) {
-                    onResult(InstallResult.Success)
-                } else if (output.contains("INSTALL_FAILED_UPDATE_INCOMPATIBLE", ignoreCase = true) ||
-                    output.contains("signatures do not match", ignoreCase = true) ||
-                    output.contains("SHARED_USER_INCOMPATIBLE", ignoreCase = true)
-                ) {
-                    onResult(
-                        InstallResult.SignatureMismatch(
-                            "You have a Debug build installed which conflicts with the Release APK signature."
-                        )
-                    )
-                } else {
-                    performStandardPackageInstall(context, apkFile, onResult)
-                }
-            }
-            return@withContext
-        }
-
-        // Engine B: Standard Android PackageInstaller Session API
         withContext(Dispatchers.Main) {
             performStandardPackageInstall(context, apkFile, onResult)
         }
@@ -134,8 +103,6 @@ class UpdateInstaller @Inject constructor(
         targetVersionName: String,
         onAppClosing: () -> Unit
     ) = withContext(Dispatchers.IO) {
-        var publicApkFile: File? = null
-
         if (downloadedApkFile != null && downloadedApkFile.exists()) {
             try {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -157,7 +124,6 @@ class UpdateInstaller @Inject constructor(
                     val publicDownloadsDir = android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS)
                     val targetFile = File(publicDownloadsDir, "FrameX_v${targetVersionName}-release.apk")
                     downloadedApkFile.copyTo(targetFile, overwrite = true)
-                    publicApkFile = targetFile
                 }
                 withContext(Dispatchers.Main) {
                     android.widget.Toast.makeText(
@@ -175,15 +141,6 @@ class UpdateInstaller @Inject constructor(
             onAppClosing()
         }
 
-        // ENGINE A: Shizuku Shell Daemon 2-Step Auto Uninstall & Re-install Chain
-        if (shizukuManager.isShizukuAvailable.value && shizukuManager.hasPermission.value) {
-            val apkPath = publicApkFile?.absolutePath ?: "/sdcard/Download/FrameX_v${targetVersionName}-release.apk"
-            val command = "cmd package uninstall ${context.packageName} && cmd package install -r \"$apkPath\""
-            shizukuManager.executeCommand(command)
-            return@withContext
-        }
-
-        // ENGINE B: Standard Fallback System Uninstaller Intent
         withContext(Dispatchers.Main) {
             try {
                 val uninstallIntent = Intent(Intent.ACTION_DELETE, Uri.parse("package:${context.packageName}")).apply {
