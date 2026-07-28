@@ -5,7 +5,14 @@ import java.io.BufferedReader
 import java.io.InputStreamReader
 import kotlin.system.exitProcess
 
-class CommandRunnerService(private val context: Context) : ICommandRunner.Stub() {
+class CommandRunnerService private constructor(
+    private val context: Context?,
+    @Suppress("UNUSED_PARAMETER") constructorMarker: Unit
+) : ICommandRunner.Stub() {
+
+    constructor() : this(null, Unit)
+
+    constructor(context: Context) : this(context, Unit)
 
     /** Which mechanism successfully returned thermal sensor data. See [resolvedThermalStrategy]. */
     private enum class ThermalReadStrategy {
@@ -28,15 +35,14 @@ class CommandRunnerService(private val context: Context) : ICommandRunner.Stub()
 
     override fun executeCommand(command: String): String {
         return try {
-            val process = Runtime.getRuntime().exec(arrayOf("sh", "-c", command))
-            val reader = BufferedReader(InputStreamReader(process.inputStream))
-            val output = StringBuilder()
-            var line: String?
-            while (reader.readLine().also { line = it } != null) {
-                output.append(line).append("\n")
+            val process = ProcessBuilder("sh", "-c", command)
+                .redirectErrorStream(true)
+                .start()
+            val output = BufferedReader(InputStreamReader(process.inputStream)).use { reader ->
+                reader.readText().trim()
             }
             process.waitFor()
-            output.toString().trim()
+            output
         } catch (e: Exception) {
             com.framex.app.utils.FrameXLog.e("Error executing command: $command", e)
             "Error executing command: ${e.message}"
@@ -277,7 +283,7 @@ class CommandRunnerService(private val context: Context) : ICommandRunner.Stub()
         if (packageNames.isNullOrEmpty()) return 0
         var successCount = 0
         try {
-            val pm = context.packageManager
+            val pm = context?.packageManager ?: throw IllegalStateException("UserService context unavailable")
             val method = pm.javaClass.getMethod(
                 "setPackagesSuspended",
                 Array<String>::class.java,

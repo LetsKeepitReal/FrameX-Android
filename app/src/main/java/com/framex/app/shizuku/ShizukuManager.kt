@@ -1,6 +1,7 @@
 package com.framex.app.shizuku
 
 import android.content.pm.PackageManager
+import com.framex.app.BuildConfig
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -14,6 +15,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import android.content.ComponentName
 import android.content.ServiceConnection
 import android.os.IBinder
+import android.os.SystemClock
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -31,6 +33,7 @@ class ShizukuManager @Inject constructor() {
     @Volatile private var isConnecting = false
     private var userServiceConnection: android.content.ServiceConnection? = null
     private var pendingConnection: CompletableDeferred<ICommandRunner?>? = null
+    private var firstBindNotBeforeMs = 0L
 
     private val _hasPermission = MutableStateFlow(false)
     val hasPermission: StateFlow<Boolean> = _hasPermission.asStateFlow()
@@ -38,7 +41,6 @@ class ShizukuManager @Inject constructor() {
     private val binderReceivedListener = Shizuku.OnBinderReceivedListener {
         _isShizukuAvailable.value = true
         checkPermission()
-        if (_hasPermission.value) connectUserService()
     }
 
     private val binderDeadListener = Shizuku.OnBinderDeadListener {
@@ -50,7 +52,6 @@ class ShizukuManager @Inject constructor() {
     private val requestPermissionResultListener = Shizuku.OnRequestPermissionResultListener { requestCode, grantResult ->
         if (requestCode == REQUEST_CODE_PERMISSION) {
             _hasPermission.value = grantResult == PackageManager.PERMISSION_GRANTED
-            if (_hasPermission.value) connectUserService()
         }
     }
 
@@ -61,9 +62,9 @@ class ShizukuManager @Inject constructor() {
             Shizuku.addRequestPermissionResultListener(requestPermissionResultListener)
             
             _isShizukuAvailable.value = Shizuku.pingBinder()
+            firstBindNotBeforeMs = SystemClock.elapsedRealtime() + INITIAL_BIND_DELAY_MS
             if (_isShizukuAvailable.value) {
                 checkPermission()
-                if (_hasPermission.value) connectUserService()
             }
         } catch (e: Exception) {
             com.framex.app.utils.FrameXLog.e("Shizuku init error", e)
@@ -76,7 +77,6 @@ class ShizukuManager @Inject constructor() {
             _isShizukuAvailable.value = Shizuku.pingBinder()
             if (_isShizukuAvailable.value) {
                 checkPermission()
-                if (_hasPermission.value) connectUserService()
             } else {
                 _hasPermission.value = false
             }
@@ -113,13 +113,15 @@ class ShizukuManager @Inject constructor() {
 
     private suspend fun awaitCommandRunner(): ICommandRunner? {
         commandRunner?.let { return it }
+        val initialDelayMs = firstBindNotBeforeMs - SystemClock.elapsedRealtime()
+        if (initialDelayMs > 0L) {
+            kotlinx.coroutines.delay(initialDelayMs)
+        }
         connectUserService()
         val deferred = pendingConnection ?: return commandRunner
         val runner = withTimeoutOrNull(BIND_TIMEOUT_MS) { deferred.await() }
         if (runner == null) {
-            isConnecting = false
-            pendingConnection?.complete(null)
-            pendingConnection = null
+            disconnectUserService(remove = true)
         }
         return runner
     }
@@ -232,12 +234,11 @@ class ShizukuManager @Inject constructor() {
 
         com.framex.app.utils.FrameXLog.w("connectUserService: attempting bindUserService")
 
-        val args = Shizuku.UserServiceArgs(
-            ComponentName("com.framex.app", CommandRunnerService::class.java.name)
-        ).daemon(false).processNameSuffix("runner")
+        val args = userServiceArgs()
 
         val connection = object : android.content.ServiceConnection {
             override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
+                if (userServiceConnection !== this) return
                 com.framex.app.utils.FrameXLog.w("connectUserService: onServiceConnected")
                 val runner = ICommandRunner.Stub.asInterface(service)
                 commandRunner = runner
@@ -246,14 +247,12 @@ class ShizukuManager @Inject constructor() {
                 pendingConnection = null
             }
             override fun onServiceDisconnected(name: ComponentName?) {
+                if (userServiceConnection !== this) return
                 com.framex.app.utils.FrameXLog.w("connectUserService: onServiceDisconnected")
                 commandRunner = null
                 isConnecting = false
                 pendingConnection?.complete(null)
                 pendingConnection = null
-                if (_isShizukuAvailable.value && _hasPermission.value) {
-                    connectUserService()
-                }
             }
         }
         userServiceConnection = connection
@@ -268,13 +267,17 @@ class ShizukuManager @Inject constructor() {
         }
     }
 
-    private fun disconnectUserService() {
-        val conn = userServiceConnection ?: return
-        val args = Shizuku.UserServiceArgs(
-            ComponentName("com.framex.app", CommandRunnerService::class.java.name)
-        ).daemon(false).processNameSuffix("runner")
+    private fun disconnectUserService(remove: Boolean = false) {
+        val conn = userServiceConnection
+        if (conn == null) {
+            commandRunner = null
+            isConnecting = false
+            pendingConnection?.complete(null)
+            pendingConnection = null
+            return
+        }
         try {
-            Shizuku.unbindUserService(args, conn, false)
+            Shizuku.unbindUserService(userServiceArgs(), conn, remove)
         } catch (e: Exception) {
             com.framex.app.utils.FrameXLog.e("unbindUserService failed", e)
         }
@@ -285,8 +288,17 @@ class ShizukuManager @Inject constructor() {
         pendingConnection = null
     }
 
+    private fun userServiceArgs() = Shizuku.UserServiceArgs(
+        ComponentName("com.framex.app", CommandRunnerService::class.java.name)
+    ).daemon(false)
+        .tag(USER_SERVICE_TAG)
+        .version(BuildConfig.VERSION_CODE)
+        .processNameSuffix("runner")
+
     companion object {
         const val REQUEST_CODE_PERMISSION = 1001
-        private const val BIND_TIMEOUT_MS = 3000L
+        private const val BIND_TIMEOUT_MS = 5000L
+        private const val INITIAL_BIND_DELAY_MS = 2000L
+        private const val USER_SERVICE_TAG = "framex-command-runner"
     }
 }
