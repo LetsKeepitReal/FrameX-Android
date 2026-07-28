@@ -115,7 +115,13 @@ class ShizukuManager @Inject constructor() {
         commandRunner?.let { return it }
         connectUserService()
         val deferred = pendingConnection ?: return commandRunner
-        return withTimeoutOrNull(BIND_TIMEOUT_MS) { deferred.await() }
+        val runner = withTimeoutOrNull(BIND_TIMEOUT_MS) { deferred.await() }
+        if (runner == null) {
+            isConnecting = false
+            pendingConnection?.complete(null)
+            pendingConnection = null
+        }
+        return runner
     }
 
     suspend fun executeCommand(command: String): String {
